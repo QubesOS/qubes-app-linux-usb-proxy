@@ -1,0 +1,88 @@
+#!/bin/sh
+
+modprobe vhci-hcd || exit 1
+
+DEVPATH="/sys/devices/platform/vhci_hcd"
+
+# From /usr/include/linux/usbip.h
+VDEV_ST_NULL=4
+VDEV_ST_NOTASSIGNED=5
+VDEV_ST_USED=6
+VDEV_ST_ERROR=7
+
+usage() {
+    echo "$0 pidfile"
+}
+
+if [ "$#" -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+statefile="$1"
+
+if [ -n "$SERVICE_ATTACH_PID" ]; then
+    # use stderr of qubes.USBAttach service call
+    # otherwise it would be redirected to /dev/null
+    # (see comment in qubes.USBAttach)
+    exec 2>/proc/$SERVICE_ATTACH_PID/fd/2
+fi
+
+# based on linux/tools/usb/usbip/libsrc/vhci_driver.c
+find_port() {
+    while read prt sta spd bus dev socket local_busid extra; do
+        if [ "$prt" = "prt" ]; then
+            # header
+            continue
+        elif [ "$sta" -eq $VDEV_ST_NULL ]; then
+            echo $prt
+            return 0
+        fi
+    done < $DEVPATH/status
+    echo "No unused port found!" >&2
+    exit 1
+}
+
+attach() {
+    local port="$1"
+    local remote_devid="$2"
+    local speed="$3"
+    # port sockfd devid speed
+    printf "%u %u %u %u" "$port" "0" "$remote_devid" "$speed" > $DEVPATH/attach
+}
+
+# negotiate parameters (field 'extra' reserved for future use)
+read untrusted_devid untrusted_speed untrusted_extra
+
+case "$untrusted_speed" in
+    1.5) speed=1 ;; # Low Speed
+    12)  speed=2 ;; # Full speed
+    480) speed=3 ;; # High Speed
+    53.3-480) speed=4 ;; # Wireless
+    5000) speed=5 ;; # Super Speed
+    *) echo "Invalid speed received" >&2; exit 1 ;;
+esac
+
+# 32bit integer
+if [ "$untrusted_devid" -ge 0 -a "$untrusted_devid" -lt "$[ 2 ** 32 ]" ]; then
+    devid="$untrusted_devid"
+else
+    echo "Invalid devid" >&2
+    exit 1
+fi
+
+port=$(find_port)
+
+# Request that both IN and OUT be handled on a single (stdin) socket
+kill -USR1 "$QREXEC_AGENT_PID" || exit 1
+
+attach "$port" "$devid" "$speed" || exit 1
+
+# close stdin so the kernel is the only one holding the socket
+exec <&-
+
+echo $port >"$statefile"
+# notify qubes.USBAttach service about successful connection
+if [ -n "$SERVICE_ATTACH_PID" ]; then
+    kill -HUP $SERVICE_ATTACH_PID
+fi

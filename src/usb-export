@@ -1,0 +1,138 @@
+#!/bin/sh
+
+SYS_USB_DEVICES=/sys/bus/usb/devices
+SYS_USBIP_HOST=/sys/bus/usb/drivers/usbip-host
+
+# From /usr/include/linux/usbip.h
+SDEV_ST_AVAILABLE=1
+SDEV_ST_USED=2
+SDEV_ST_ERROR=3
+
+usage() {
+    echo "$0 device"
+}
+
+if [ "$#" -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+find_by_bus_dev() {
+    local busnum=$1
+    local devnum=$2
+    for devpath in $SYS_USB_DEVICES/*; do
+        if ! [ -e $devpath/busnum -a -e $devpath/devnum ]; then
+            # skip individual interfaces etc
+            continue
+        fi
+        if [ "$busnum" -eq "$(cat $devpath/busnum)" -a \
+                "$devnum" -eq "$(cat $devpath/devnum)" ]; then
+            echo $devpath
+            return
+        fi
+    done
+    echo "No matching device found ($bus, $dev)" >&2
+    exit 1
+}
+
+# Resolve device name to sysfs path
+resolve_device() {
+    device="$1"
+    # handle different device formats
+    case $device in
+        0x*.0x*)
+            device=$(echo "$device" | tr . :)
+            # make sure there is only one matching device
+            if [ $(lsusb -d $device | wc -l) -ne 1 ]; then
+                echo "Multiple or no devices matching $device, aborting!" >&2
+                exit 1
+            fi
+            # Example: Bus 003 Device 002: ID 05e3:0608 Genesys Logic, Inc. Hub
+            lsusb_output="$(lsusb -d $device)"
+            bus=$(echo "$lsusb_output" | cut -d ' ' -f 2)
+            dev=$(echo "$lsusb_output" | cut -d ' ' -f 4 | tr -d :)
+            find_by_bus_dev "$bus" "$dev"
+            ;;
+        *-*)
+            # a single device, but NOT a specific interface
+            if echo "$device" | grep -q :; then
+                echo "You cannot export a specific device interface!" >&2
+                exit 1
+            fi
+            if ! [ -d "$SYS_USB_DEVICES/$device" ]; then
+                echo "No such device: $device" >&2
+                exit 1
+            fi
+            echo "$SYS_USB_DEVICES/$device"
+            ;;
+        *)
+            echo "Invalid device format: $device" >&2
+            exit 1
+            ;;
+    esac
+}
+
+devpath=$(resolve_device "$1")
+if [ -z "$devpath" ]; then
+    exit 1
+fi
+
+pidfile="/var/run/qubes/usb-export-$(basename $devpath).pid"
+
+modprobe usbip-host || exit 1
+
+# Request that both IN and OUT be handled on a single (stdin) socket
+kill -USR1 "$QREXEC_AGENT_PID" || exit 1
+
+busid=$(basename "$devpath")
+# Unbind the device from other drivers
+if [ -d "$devpath/driver" -a \
+        "$(readlink -f $devpath/driver)" != "$SYS_USBIP_HOST" ]; then
+    echo $busid > $devpath/driver/unbind || exit 1
+fi
+
+# Bind to the usbip-host driver if needed
+if ! [ -e $SYS_USBIP_HOST/$busid ]; then
+    echo -n add $busid > $SYS_USBIP_HOST/match_busid || exit 1
+    echo $busid > $SYS_USBIP_HOST/bind || exit 1
+fi
+
+# One more safety check - make sure the device is available
+if [ "$(cat $devpath/usbip_status)" -ne $SDEV_ST_AVAILABLE ]; then
+    echo "Device $devpath not available!" >&2
+    exit 1
+fi
+
+busnum=$(cat $devpath/busnum)
+devnum=$(cat $devpath/devnum)
+devid=$[ $busnum << 16 | $devnum ]
+speed=$(cat $devpath/speed)
+
+# Send device details to the other end (usb-import script)
+echo "$devid" "$speed" >&0
+
+echo 0 > $devpath/usbip_sockfd || exit 1
+exec <&-
+
+echo $$ > "$pidfile"
+safe_busid=$(echo ${busid} | tr : _)
+
+cleanup() {
+    qubesdb-rm \
+        /qubes-usb-devices/${safe_busid}/connected-to \
+        /qubes-usb-devices/${safe_busid}/x-pid
+    exit
+}
+trap "cleanup" EXIT TERM
+qubesdb-write \
+    /qubes-usb-devices/${safe_busid}/connected-to "${QREXEC_REMOTE_DOMAIN}" \
+    /qubes-usb-devices/${safe_busid}/x-pid "$$"
+
+# FIXME this is racy as hell!
+while sleep 1; do
+    # wait while device is "used"
+    if [ "$(cat $devpath/usbip_status)" -ne $SDEV_ST_USED ]; then
+        break
+    fi
+done
+# cleanup will be called automatically

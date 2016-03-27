@@ -1,0 +1,10 @@
+#!/bin/sh
+
+service_arg="$1"
+if [ -z "$service_arg" ]; then
+    echo "You must give device id as a service argument" >&2
+    exit 1
+fi
+
+# preserve QREXEC_AGENT_PID variable
+exec sudo -E /usr/lib/qubes/usb-export "$service_arg"

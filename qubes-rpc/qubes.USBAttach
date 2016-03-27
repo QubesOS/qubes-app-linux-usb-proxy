@@ -1,0 +1,15 @@
+#!/bin/sh
+
+read domain busid
+statefile="/var/run/qubes/usb-import-${domain}-${busid}.state"
+export SERVICE_ATTACH_PID=$$
+trap "exit 0" HUP
+# don't let qrexec-client-vm keeping open FDs - that would prevent
+# qubes.USBAttach service to end.
+# On the other hand, access stderr from inside of usb-import, to report
+# connection errors
+qrexec-client-vm "$domain" "qubes.USB+$busid" \
+    /usr/lib/qubes/usb-import "$statefile" \
+    </dev/null >/dev/null 2>/dev/null &
+wait
+exit 1
