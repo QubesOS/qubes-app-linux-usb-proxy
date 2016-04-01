@@ -18,7 +18,7 @@ USBIP wrapper to run it over Qubes RPC connection
 
 
 %install
-%make_install
+make install-vm DESTDIR=${RPM_BUILD_ROOT}
 
 
 %files
