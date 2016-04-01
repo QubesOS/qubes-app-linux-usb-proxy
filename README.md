@@ -80,14 +80,14 @@ below.
 
 Attach device `2-1` of domain `sys-usb` to domain `work-usb`:
 
-    echo sys-usb 2-1 | qvm-run -p work-usb 'QUBESRPC qubes.USBAttach dom0'
+    echo sys-usb 2-1 | qvm-run -p -u root work-usb 'QUBESRPC qubes.USBAttach dom0'
 
 Detach that device:
 
-    echo sys-usb 2-1 | qvm-run -p work-usb 'QUBESRPC qubes.USBDetach dom0'
+    echo sys-usb 2-1 | qvm-run -p -u root work-usb 'QUBESRPC qubes.USBDetach dom0'
 
 
 Using python API it will be:
 
-    frontend_vm.run_service('qubes.USBAttach', input='sys-usb 2-1')
-    frontend_vm.run_service('qubes.USBDetach', input='sys-usb 2-1')
+    frontend_vm.run_service('qubes.USBAttach', input='sys-usb 2-1', user='root')
+    frontend_vm.run_service('qubes.USBDetach', input='sys-usb 2-1', user='root')
