@@ -11,7 +11,7 @@ VDEV_ST_USED=6
 VDEV_ST_ERROR=7
 
 usage() {
-    echo "$0 pidfile"
+    echo "$0 statefile"
 }
 
 if [ "$#" -lt 1 ]; then
@@ -51,6 +51,18 @@ attach() {
     printf "%u %u %u %u" "$port" "0" "$remote_devid" "$speed" > $DEVPATH/attach
 }
 
+wait_for_attached() {
+    local port="$1"
+    local local_busid="0-0"
+    while [ ! -e /sys/bus/usb/devices/$local_busid ]; do
+        sleep 0.2
+        port_status=$(grep "^$port" $DEVPATH/status)
+        local_busid=${port_status##* }
+    done
+    udevadm settle
+}
+
+
 # negotiate parameters (field 'extra' reserved for future use)
 read untrusted_devid untrusted_speed untrusted_extra
 
@@ -78,10 +90,11 @@ kill -USR1 "$QREXEC_AGENT_PID" || exit 1
 
 attach "$port" "$devid" "$speed" || exit 1
 
-# close stdin so the kernel is the only one holding the socket
-exec <&-
-
 echo $port >"$statefile"
+
+# wait for device really being attached
+wait_for_attached "$port"
+
 # notify qubes.USBAttach service about successful connection
 if [ -n "$SERVICE_ATTACH_PID" ]; then
     kill -HUP $SERVICE_ATTACH_PID
