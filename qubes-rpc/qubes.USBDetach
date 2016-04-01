@@ -1,6 +1,29 @@
 #!/bin/sh
 
 read domain busid
-DEVPATH="/sys/devices/platform/vhci_hcd"
-statefile="/var/run/qubes/usb-import-${domain}-${busid}.state"
-cat $statefile > $DEVPATH/detach && rm $statefile
+if [ -z "$busid" ]; then
+    # when only one argument given, detach local device from whateved domain it
+    # was exported to
+    busid="$domain"
+    usbip_sockfd="/sys/bus/usb/devices/$busid/usbip_sockfd"
+    if [ -w "$usbip_sockfd" ]; then
+        echo -1 > "$usbip_sockfd"
+    else
+        echo "Device $busid not found or not attached to any VM!" >&2
+        exit 1
+    fi
+else
+    DEVPATH="/sys/devices/platform/vhci_hcd"
+    statefile="/var/run/qubes/usb-import-${domain}-${busid}.state"
+    if [ ! -r "$statefile" ]; then
+        echo "Device $busid from domain $domain not attached!" >&2
+        exit 1
+    fi
+    port=$(cat "$statefile")
+    port_status=$(grep "^$port" $DEVPATH/status)
+    local_busid=${port_status##* }
+    echo $port > $DEVPATH/detach && rm $statefile
+    while [ -e /sys/bus/usb/devices/$local_busid ]; do
+        sleep 0.2
+    done
+fi

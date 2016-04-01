@@ -86,8 +86,13 @@ Detach that device:
 
     echo sys-usb 2-1 | qvm-run -p -u root work-usb 'QUBESRPC qubes.USBDetach dom0'
 
+Alternativelly you can detach the device calling backend domain (USB VM):
+
+    echo 2-1 | qvm-run -p -u root sys-usb 'QUBESRPC qubes.USBDetach dom0'
 
 Using python API it will be:
 
     frontend_vm.run_service('qubes.USBAttach', input='sys-usb 2-1', user='root')
     frontend_vm.run_service('qubes.USBDetach', input='sys-usb 2-1', user='root')
+
+    backend_vm.run_service('qubes.USBDetach', input='2-1', user='root')
