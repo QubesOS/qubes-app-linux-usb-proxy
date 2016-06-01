@@ -22,6 +22,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 import unittest
+import qubes.tests.extra
 
 # if this fails, skip the test (missing software/configuration in the VM)
 import time
@@ -51,32 +52,42 @@ GADGET_PREPARE = ';'.join([
     "sleep 2; udevadm settle",
 ])
 
+def create_usb_gadget(vm):
+    vm.start()
+    p = vm.run(GADGET_PREREQ, user="root",
+        passio_popen=True, passio_stderr=True)
+    (_, stderr) = p.communicate()
+    if p.returncode != 0:
+        raise unittest.SkipTest("missing USB Gadget subsystem")
+    p = vm.run(GADGET_PREPARE, user="root",
+        passio_popen=True, passio_stderr=True)
+    (_, stderr) = p.communicate()
+    if p.returncode != 0:
+        raise RuntimeError("Failed to setup USB gadget: " + stderr)
+    p = vm.run(
+        'ls /sys/bus/platform/devices/dummy_hcd.0/usb*|grep -x .-.',
+        passio_popen=True)
+    (stdout, _) = p.communicate()
+    stdout = stdout.strip()
+    if not stdout:
+        raise RuntimeError("Failed to get dummy device ID")
+    return stdout
 
-class TC_00_USBProxy(unittest.TestCase):
+def remove_usb_gadget(vm):
+    assert vm.is_running()
+
+    retcode = vm.run("echo > /sys/kernel/config/usb_gadget/test_g1/UDC",
+        user="root", wait=True)
+    if retcode != 0:
+        raise RuntimeError("Failed to disable USB gadget")
+
+class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
     def setUp(self):
         super(TC_00_USBProxy, self).setUp()
         vms = self.create_vms(["backend", "frontend"])
         (self.backend, self.frontend) = vms
         self.qrexec_policy('qubes.USB', self.frontend.name, self.backend.name)
-        self.backend.start()
-        p = self.backend.run(GADGET_PREREQ, user="root",
-            passio_popen=True, passio_stderr=True)
-        (_, stderr) = p.communicate()
-        if p.returncode != 0:
-            self.skipTest("missing USB Gadget subsystem")
-        p = self.backend.run(GADGET_PREPARE, user="root",
-            passio_popen=True, passio_stderr=True)
-        (_, stderr) = p.communicate()
-        if p.returncode != 0:
-            raise RuntimeError("Failed to setup USB gadget: " + stderr)
-        p = self.backend.run(
-            'ls /sys/bus/platform/devices/dummy_hcd.0/usb*|grep -x .-.',
-            passio_popen=True)
-        (stdout, _) = p.communicate()
-        stdout = stdout.strip()
-        if not stdout:
-            raise RuntimeError("Failed to get dummy device ID")
-        self.dummy_usb_dev = stdout
+        self.dummy_usb_dev = create_usb_gadget(self.backend)
 
     def test_000_attach_detach(self):
         self.frontend.start()
@@ -113,8 +124,133 @@ class TC_00_USBProxy(unittest.TestCase):
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234', wait=True), 1,
             "Device disconnection failed")
 
+    def test_020_detach_on_remove(self):
+        self.frontend.start()
+        self.assertEqual(self.frontend.run_service('qubes.USBAttach',
+            user='root',
+            input="{} {}".format(self.backend.name, self.dummy_usb_dev)), 0,
+            "qubes.USBAttach call failed")
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
+        remove_usb_gadget(self.backend)
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234', wait=True), 1,
+            "Device not cleaned up")
+        # TODO: check for kernel errors?
+
+class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
+    def setUp(self):
+        import qubes.qubesutils
+        super(TC_10_USBProxy_core2, self).setUp()
+        vms = self.create_vms(["backend", "frontend"])
+        (self.backend, self.frontend) = vms
+        self.qrexec_policy('qubes.USB', self.frontend.name, self.backend.name)
+        self.dummy_usb_dev = create_usb_gadget(self.backend)
+        self.usbdev_name = '{}:{}'.format(self.backend.name, self.dummy_usb_dev)
+
+    def test_000_list_all(self):
+        usb_list = qubes.qubesutils.usb_list(self.qc)
+        self.assertIn(self.usbdev_name, usb_list)
+
+    def test_010_list_vm(self):
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        self.assertIn(self.usbdev_name, usb_list)
+
+    def test_020_attach(self):
+        self.frontend.start()
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        qubes.qubesutils.usb_attach(self.qc,
+            self.frontend, usb_list[self.usbdev_name])
+
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
+
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        self.assertEquals(usb_list[self.usbdev_name]['connected-to'],
+            self.frontend)
+
+    def test_030_detach(self):
+        self.frontend.start()
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        qubes.qubesutils.usb_attach(self.qc, self.frontend,
+            usb_list[self.usbdev_name])
+
+        qubes.qubesutils.usb_detach(self.qc, self.frontend,
+            usb_list[self.usbdev_name])
+        # FIXME: usb-export script may update qubesdb with 1sec delay
+        time.sleep(1)
+
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        self.assertIsNone(usb_list[self.usbdev_name]['connected-to'])
+
+        self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device disconnection failed")
+
+    def test_040_detach_all(self):
+        self.frontend.start()
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        qubes.qubesutils.usb_attach(self.qc, self.frontend,
+            usb_list[self.usbdev_name])
+
+        qubes.qubesutils.usb_detach_all(self.qc, self.frontend)
+        # FIXME: usb-export script may update qubesdb with 1sec delay
+        time.sleep(1)
+
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        self.assertIsNone(usb_list[self.usbdev_name]['connected-to'])
+
+        self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device disconnection failed")
+
+    def test_050_list_attached(self):
+        """ Attached device should not be listed as further attachable """
+        self.frontend.start()
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+
+        usb_list_front_pre = qubes.qubesutils.usb_list(self.qc,
+            vm=self.frontend)
+
+        qubes.qubesutils.usb_attach(self.qc,
+            self.frontend, usb_list[self.usbdev_name])
+
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
+
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        self.assertEquals(usb_list[self.usbdev_name]['connected-to'],
+            self.frontend)
+
+        usb_list_front_post = qubes.qubesutils.usb_list(self.qc,
+            vm=self.frontend)
+
+        self.assertEquals(usb_list_front_pre, usb_list_front_post)
+
+    def test_060_auto_detach_on_remove(self):
+        self.frontend.start()
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        qubes.qubesutils.usb_attach(self.qc, self.frontend,
+            usb_list[self.usbdev_name])
+
+        remove_usb_gadget(self.backend)
+        # FIXME: usb-export script may update qubesdb with 1sec delay
+        time.sleep(1)
+
+        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
+        self.assertNotIn(self.usbdev_name, usb_list)
+        self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device disconnection failed")
+
 
 def list_tests():
-    return (
-        TC_00_USBProxy,
-    )
+    tests = [TC_00_USBProxy]
+    try:
+        import qubes.qubesutils
+        tests += [TC_10_USBProxy_core2]
+    except ImportError:
+        pass
+    return tests
