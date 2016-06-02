@@ -1,3 +1,9 @@
+qubes-usb-proxy (1.0.0) wheezy; urgency=medium
+
+  * 
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 02 Jun 2016 04:26:51 +0200
+
 qubes-usb-proxy (0.1) unstable; urgency=low
 
   * Initial release for debian
