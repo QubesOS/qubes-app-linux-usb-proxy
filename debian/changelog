@@ -1,0 +1,5 @@
+qubes-usb-proxy (0.1) unstable; urgency=low
+
+  * Initial release for debian
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 02 Jun 2016 04:01:36 +0200

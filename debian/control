@@ -1,0 +1,15 @@
+Source: qubes-usb-proxy
+Section: utils
+Priority: optional
+Maintainer: Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.6
+Homepage:  http://www.qubes-os.org
+
+Package: qubes-usb-proxy
+Architecture: any
+Depends: ${shlibs:Depends}, qubes-core-agent(>=3.2.0)
+Description: USBIP wrapper to run it over Qubes RPC connection
+ This package wraps USBIP connection in Qubes RPC, which makes it possible to
+ passthrough USB device between qubes, without enabling networking between
+ them.
