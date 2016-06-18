@@ -76,7 +76,7 @@ case "$untrusted_speed" in
 esac
 
 # 32bit integer
-if [ "$untrusted_devid" -ge 0 -a "$untrusted_devid" -lt "$[ 2 ** 32 ]" ]; then
+if [ "$untrusted_devid" -ge 0 -a "$untrusted_devid" -lt 4294967296 ]; then
     devid="$untrusted_devid"
 else
     echo "Invalid devid" >&2
