@@ -1,3 +1,10 @@
+qubes-usb-proxy (1.0.2) wheezy; urgency=medium
+
+  * One more bash-related fix
+  * tests: increase wait time for device disconnection
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 24 Jun 2016 22:44:26 +0200
+
 qubes-usb-proxy (1.0.1) wheezy; urgency=medium
 
   * Don't use bash-specific features
