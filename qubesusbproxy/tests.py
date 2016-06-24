@@ -179,7 +179,7 @@ class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
         qubes.qubesutils.usb_detach(self.qc, self.frontend,
             usb_list[self.usbdev_name])
         # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(1)
+        time.sleep(2)
 
         usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
         self.assertIsNone(usb_list[self.usbdev_name]['connected-to'])
@@ -196,7 +196,7 @@ class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
 
         qubes.qubesutils.usb_detach_all(self.qc, self.frontend)
         # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(1)
+        time.sleep(2)
 
         usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
         self.assertIsNone(usb_list[self.usbdev_name]['connected-to'])
