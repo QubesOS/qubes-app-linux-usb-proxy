@@ -105,7 +105,7 @@ fi
 
 busnum=$(cat $devpath/busnum)
 devnum=$(cat $devpath/devnum)
-devid=$[ $busnum << 16 | $devnum ]
+devid=$(( $busnum << 16 | $devnum ))
 speed=$(cat $devpath/speed)
 
 # Send device details to the other end (usb-import script)
