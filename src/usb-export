@@ -131,7 +131,7 @@ qubesdb-write \
 # FIXME this is racy as hell!
 while sleep 1; do
     # wait while device is "used"
-    if [ "$(cat $devpath/usbip_status)" -ne $SDEV_ST_USED ]; then
+    if [ "$(cat $devpath/usbip_status 2>/dev/null || echo 0)" -ne $SDEV_ST_USED ]; then
         break
     fi
 done
