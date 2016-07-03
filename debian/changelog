@@ -1,3 +1,10 @@
+qubes-usb-proxy (1.0.3) wheezy; urgency=medium
+
+  * Fix detecting disconnected device
+  * Fix announcing where device is connected
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sun, 03 Jul 2016 23:30:09 +0200
+
 qubes-usb-proxy (1.0.2) wheezy; urgency=medium
 
   * One more bash-related fix
