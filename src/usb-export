@@ -115,7 +115,7 @@ echo 0 > $devpath/usbip_sockfd || exit 1
 exec <&-
 
 echo $$ > "$pidfile"
-safe_busid=$(echo ${busid} | tr : _)
+safe_busid=$(echo ${busid} | tr :. _)
 
 cleanup() {
     qubesdb-rm \
