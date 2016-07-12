@@ -1,3 +1,11 @@
+qubes-usb-proxy (1.0.4) wheezy; urgency=medium
+
+  * Prefer reporting error code from backend domain
+  * tests: handle package not installed errors
+  * rpm: use `version` file for dom0 package too
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Tue, 12 Jul 2016 06:23:29 +0200
+
 qubes-usb-proxy (1.0.3) wheezy; urgency=medium
 
   * Fix detecting disconnected device
