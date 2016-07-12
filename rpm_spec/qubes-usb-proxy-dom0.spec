@@ -1,10 +1,10 @@
-#%%{!?version: %define version %(cat version)}
+%{!?version: %define version %(cat version)}
 %if 0%{?qubes_builder}
 %define _builddir %(pwd)
 %endif
 
 Name:		qubes-usb-proxy-dom0
-Version:	0.1
+Version:	%{version}
 Release:	1%{?dist}
 Summary:	USBIP wrapper to run it over Qubes RPC connection - dom0 files
 
