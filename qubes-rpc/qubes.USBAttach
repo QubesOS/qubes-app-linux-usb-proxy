@@ -11,7 +11,7 @@ trap "exit 0" HUP
 qrexec-client-vm "$domain" "qubes.USB+$busid" \
     /usr/lib/qubes/usb-import "$statefile" \
     </dev/null >/dev/null 2>/dev/null &
-wait -n
+wait $!
 remote_retcode=$?
 # prefer reporting remote error code
 if [ "$remote_retcode" -gt 0 ]; then
