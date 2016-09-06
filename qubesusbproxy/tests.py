@@ -23,9 +23,22 @@
 #
 import unittest
 import qubes.tests.extra
-
-# if this fails, skip the test (missing software/configuration in the VM)
 import time
+
+core2 = False
+core3 = False
+try:
+    import qubesusbproxy.core3ext
+    core3 = True
+except ImportError:
+    pass
+
+try:
+    import qubes.qubesutils
+    core2 = True
+except ImportError:
+    pass
+
 
 GADGET_PREREQ = '&&'.join([
     "modprobe usb_f_mass_storage",
@@ -140,7 +153,6 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
 
 class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
     def setUp(self):
-        import qubes.qubesutils
         super(TC_10_USBProxy_core2, self).setUp()
         vms = self.create_vms(["backend", "frontend"])
         (self.backend, self.frontend) = vms
@@ -285,12 +297,143 @@ class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
                 usb_list[self.usbdev_name])
 
 
+class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
+    # noinspection PyAttributeOutsideInit
+    def setUp(self):
+        super(TC_20_USBProxy_core3, self).setUp()
+        vms = self.create_vms(["backend", "frontend"])
+        (self.backend, self.frontend) = vms
+        self.qrexec_policy('qubes.USB', self.frontend.name, self.backend.name)
+        self.usbdev_ident = create_usb_gadget(self.backend)
+        self.usbdev_name = '{}:{}'.format(self.backend.name, self.usbdev_ident)
+
+    def test_000_list(self):
+        usb_list = self.backend.devices['usb']
+        self.assertIn(self.usbdev_name, [str(dev) for dev in usb_list])
+
+    def test_010_attach_offline(self):
+        usb_dev = self.backend.devices['usb'][self.usbdev_ident]
+        self.frontend.devices['usb'].attach(usb_dev)
+        self.assertIsNone(usb_dev.frontend_domain)
+        try:
+            self.frontend.start()
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
+
+        self.assertEquals(usb_dev.frontend_domain,
+            self.frontend)
+
+    def test_020_attach(self):
+        self.frontend.start()
+        usb_dev = self.backend.devices['usb'][self.usbdev_ident]
+        try:
+            self.frontend.devices['usb'].attach(usb_dev)
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
+
+        self.assertEquals(usb_dev.frontend_domain,
+            self.frontend)
+
+    def test_030_detach(self):
+        self.frontend.start()
+        usb_dev = self.backend.devices['usb'][self.usbdev_ident]
+        try:
+            self.frontend.devices['usb'].attach(usb_dev)
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        self.frontend.devices['usb'].detach(usb_dev)
+        # FIXME: usb-export script may update qubesdb with 1sec delay
+        time.sleep(2)
+
+        self.assertIsNone(usb_dev.frontend_domain)
+
+        self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device disconnection failed")
+
+    def test_040_detach_offline(self):
+        usb_dev = self.backend.devices['usb'][self.usbdev_ident]
+        self.frontend.devices['usb'].attach(usb_dev)
+        self.assertIsNone(usb_dev.frontend_domain)
+        self.frontend.devices['usb'].detach(usb_dev)
+        self.assertIsNone(usb_dev.frontend_domain)
+
+    def test_050_list_attached(self):
+        """ Attached device should not be listed as further attachable """
+        self.frontend.start()
+        usb_list = self.backend.devices['usb']
+
+        usb_list_front_pre = list(self.frontend.devices['usb'])
+
+        try:
+            self.frontend.devices['usb'].attach(usb_list[self.usbdev_ident])
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
+
+        self.assertEquals(usb_list[self.usbdev_ident].frontend_domain,
+            self.frontend)
+
+        usb_list_front_post = list(self.frontend.devices['usb'])
+
+        self.assertEquals(usb_list_front_pre, usb_list_front_post)
+
+    def test_060_auto_detach_on_remove(self):
+        self.frontend.start()
+        usb_list = self.backend.devices['usb']
+        try:
+            self.frontend.devices['usb'].attach(usb_list[self.usbdev_ident])
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        remove_usb_gadget(self.backend)
+        # FIXME: usb-export script may update qubesdb with 1sec delay
+        time.sleep(1)
+
+        self.assertNotIn(self.usbdev_name, [str(dev) for dev in usb_list])
+        self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device disconnection failed")
+
+    def test_070_attach_not_installed_front(self):
+        self.frontend.start()
+        # simulate package not installed
+        retcode = self.frontend.run("rm -f /etc/qubes-rpc/qubes.USBAttach",
+            user="root", wait=True)
+        if retcode != 0:
+            raise RuntimeError("Failed to simulate not installed package")
+        usb_list = self.backend.devices['usb']
+        with self.assertRaises(qubesusbproxy.core3ext.USBProxyNotInstalled):
+            self.frontend.devices['usb'].attach(usb_list[self.usbdev_ident])
+
+    def test_075_attach_not_installed_back(self):
+        self.frontend.start()
+        # simulate package not installed
+        retcode = self.backend.run("rm -f /etc/qubes-rpc/qubes.USB",
+            user="root", wait=True)
+        if retcode != 0:
+            raise RuntimeError("Failed to simulate not installed package")
+        usb_list = self.backend.devices['usb']
+        with self.assertRaises(qubesusbproxy.core3ext.USBProxyNotInstalled):
+            self.frontend.devices['usb'].attach(usb_list[self.usbdev_ident])
+
 
 def list_tests():
     tests = [TC_00_USBProxy]
-    try:
-        import qubes.qubesutils
+    if core2:
         tests += [TC_10_USBProxy_core2]
-    except ImportError:
-        pass
+    if core3:
+        tests += [TC_20_USBProxy_core3]
     return tests
