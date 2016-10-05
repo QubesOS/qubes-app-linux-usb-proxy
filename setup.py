@@ -35,5 +35,5 @@ setup(
             'usbproxy = qubesusbproxy.core3ext:USBDeviceExtension',
         'qubes.devices':
             'usb = qubesusbproxy.core3ext:USBDevice',
-    },
+    }, install_requires=['lxml']
 )
