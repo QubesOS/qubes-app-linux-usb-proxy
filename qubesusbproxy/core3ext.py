@@ -29,7 +29,7 @@ import errno
 import qubes.devices
 import qubes.ext
 
-usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)?$")
+usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
 usb_connected_to_re = re.compile(r"^[a-zA-Z][a-zA-Z0-9_.-]*$")
 
