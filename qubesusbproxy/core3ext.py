@@ -29,9 +29,9 @@ import errno
 import qubes.devices
 import qubes.ext
 
-usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
+usb_device_re = re.compile(br"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
-usb_connected_to_re = re.compile(r"^[a-zA-Z][a-zA-Z0-9_.-]*$")
+usb_connected_to_re = re.compile(br"^[a-zA-Z][a-zA-Z0-9_.-]*$")
 
 
 class USBDevice(qubes.devices.DeviceInfo):
@@ -53,7 +53,7 @@ class USBDevice(qubes.devices.DeviceInfo):
                 return "Unknown - domain not running"
             untrusted_device_desc = self.backend_domain.qdb.read(
                 self._qdb_path + '/desc')
-            self._description = self.sanitize_desc(untrusted_device_desc)
+            self._description = self._sanitize_desc(untrusted_device_desc)
         return self._description
 
     @property
@@ -70,6 +70,8 @@ class USBDevice(qubes.devices.DeviceInfo):
                 'Device {} has invalid chars in connected-to '
                 'property'.format(self.ident))
             return None
+        untrusted_connected_to = untrusted_connected_to.decode(
+            'ascii', errors='strict')
         try:
             connected_to = self.backend_domain.app.domains[
                 untrusted_connected_to]
@@ -81,8 +83,11 @@ class USBDevice(qubes.devices.DeviceInfo):
         return connected_to
 
     @staticmethod
-    def sanitize_desc(untrusted_device_desc):
-        safe_set = set(string.letters + string.digits + string.punctuation)
+    def _sanitize_desc(untrusted_device_desc):
+        untrusted_device_desc = untrusted_device_desc.decode('ascii',
+            errors='strict')
+        safe_set = set(string.ascii_letters + string.digits +
+                       string.punctuation)
         return ''.join(
             c if c in safe_set else '_' for c in untrusted_device_desc
         )
@@ -109,12 +114,14 @@ class USBDeviceExtension(qubes.ext.Extension):
             return
         # just get list of devices, not its every property
         untrusted_dev_list = \
-            set(path.split('/')[2] for path in untrusted_dev_list)
+            set(path.split(b'/')[2] for path in untrusted_dev_list)
         for untrusted_qdb_ident in untrusted_dev_list:
             if not usb_device_re.match(untrusted_qdb_ident):
                 vm.log.warning('Invalid USB device name detected')
                 continue
-            ident = untrusted_qdb_ident.replace('_', '.')
+            ident = untrusted_qdb_ident.\
+                decode('ascii', errors='strict').\
+                replace('_', '.')
             yield USBDevice(vm, ident)
 
     @qubes.ext.handler('device-get:usb')
@@ -144,12 +151,12 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         for dev in self.get_all_devices(vm.app):
             if dev.frontend_domain == vm:
-                yield dev
+                yield (dev, {})
 
     @qubes.ext.handler('device-attach:usb')
     def on_device_attach_usb(self, vm, event, device):
         # pylint: disable=unused-argument
-        if not vm.is_running():
+        if not vm.is_running() or vm.qid == 0:
             return
 
         if not isinstance(device, USBDevice):
@@ -218,7 +225,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('device-detach:usb')
     def on_device_detach_usb(self, vm, event, device):
         # pylint: disable=unused-argument,no-self-use
-        if not vm.is_running():
+        if not vm.is_running() or vm.qid == 0:
             return
 
         if not isinstance(device, USBDevice):

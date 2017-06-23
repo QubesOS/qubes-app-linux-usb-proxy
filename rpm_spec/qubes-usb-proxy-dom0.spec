@@ -26,9 +26,9 @@ make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
 
 %files
 %attr(0664,root,qubes) %config(noreplace) /etc/qubes-rpc/policy/qubes.USB
-%dir %{python_sitelib}/qubesusbproxy-*.egg-info
-%{python_sitelib}/qubesusbproxy-*.egg-info/*
-%{python_sitelib}/qubesusbproxy
+%dir %{python3_sitelib}/qubesusbproxy-*.egg-info
+%{python3_sitelib}/qubesusbproxy-*.egg-info/*
+%{python3_sitelib}/qubesusbproxy
 
 
 %changelog

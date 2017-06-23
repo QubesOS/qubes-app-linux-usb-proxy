@@ -7,6 +7,6 @@ install-vm:
 	install src/usb-* $(DESTDIR)/usr/lib/qubes
 
 install-dom0:
-	python setup.py install -O1 --root $(DESTDIR)
+	python3 setup.py install -O1 --root $(DESTDIR)
 	install -D -m 0664 qubes-rpc/qubes.USB.policy $(DESTDIR)/etc/qubes-rpc/policy/qubes.USB
 
