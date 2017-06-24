@@ -3,6 +3,8 @@
 %define _builddir %(pwd)
 %endif
 
+%{!?python3_sitelib: %define python3_sitelib %(python3 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
+
 Name:		qubes-usb-proxy-dom0
 Version:	%{version}
 Release:	1%{?dist}
@@ -13,8 +15,8 @@ License:	GPLv2
 URL:		https://www.qubes-os.org/
 BuildArch:  noarch
 
-BuildRequires:	python
-Requires:	python
+BuildRequires:	python3
+Requires:	python3
 
 %description
 Dom0 files for Qubes USBIP wrapper. This includes Qubes tools integration.
