@@ -1,3 +1,9 @@
+qubes-usb-proxy (1.0.7) unstable; urgency=medium
+
+  * Adjust to updated API (part 2)
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Mon, 26 Jun 2017 12:45:30 +0200
+
 qubes-usb-proxy (1.0.6) unstable; urgency=medium
 
   * Add core3 integration
