@@ -106,7 +106,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     def on_device_list_usb(self, vm, event):
         # pylint: disable=unused-argument,no-self-use
 
-        if not vm.is_running():
+        if not vm.is_running() or not hasattr(vm, 'qdb'):
             return
 
         untrusted_dev_list = vm.qdb.list('/qubes-usb-devices/')
@@ -250,5 +250,6 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
-        for device in vm.devices['usb'].attached(persistent=True):
+        for assignment in vm.devices['usb'].assignments(persistent=True):
+            device = assignment.device
             self.on_device_attach_usb(vm, '', device)
