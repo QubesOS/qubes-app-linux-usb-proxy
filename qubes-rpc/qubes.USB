@@ -6,5 +6,9 @@ if [ -z "$service_arg" ]; then
     exit 1
 fi
 
-# preserve QREXEC_AGENT_PID variable
-exec sudo -E /usr/lib/qubes/usb-export "$service_arg"
+if [ "$(id -u)" -eq 0 ]; then
+    exec /usr/lib/qubes/usb-export "$service_arg"
+else
+    # preserve QREXEC_AGENT_PID variable
+    exec sudo -E /usr/lib/qubes/usb-export "$service_arg"
+fi
