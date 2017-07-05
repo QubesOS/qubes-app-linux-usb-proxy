@@ -1,3 +1,10 @@
+qubes-usb-proxy (1.0.8) unstable; urgency=medium
+
+  * Do not use sudo if already running as root
+  * Migrate core3 extension to Python3, adjust to updated API (part 2)
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 05 Jul 2017 02:45:50 +0200
+
 qubes-usb-proxy (1.0.7) unstable; urgency=medium
 
   * Adjust to updated API (part 2)
