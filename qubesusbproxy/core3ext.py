@@ -20,9 +20,11 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
+import asyncio
 import os
 import re
 import string
+import subprocess
 
 import errno
 
@@ -154,13 +156,18 @@ class USBDeviceExtension(qubes.ext.Extension):
                 yield (dev, {})
 
     @qubes.ext.handler('device-attach:usb')
-    def on_device_attach_usb(self, vm, event, device):
+    @asyncio.coroutine
+    def on_device_attach_usb(self, vm, event, device, options):
         # pylint: disable=unused-argument
         if not vm.is_running() or vm.qid == 0:
             return
 
         if not isinstance(device, USBDevice):
             return
+
+        if options:
+            raise qubes.exc.QubesException(
+                'USB device attach do not support options')
 
         if device.frontend_domain:
             raise qubes.devices.DeviceAlreadyAttached(
@@ -169,7 +176,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             )
 
         # set qrexec policy to allow this device
-        policy_line = '{} {} allow\n'.format(vm.name,
+        policy_line = '{} {} allow,user=root\n'.format(vm.name,
             device.backend_domain.name)
         policy_path = '/etc/qubes-rpc/policy/qubes.USB+{}'.format(
             device.ident)
@@ -193,19 +200,21 @@ class USBDeviceExtension(qubes.ext.Extension):
                 f.write(''.join(policy))
         try:
             # and actual attach
-            p = vm.run_service('qubes.USBAttach', passio_popen=True,
-                user='root')
-            (stdout, stderr) = p.communicate(
-                '{} {}\n'.format(device.backend_domain.name, device.ident))
-            if p.returncode == 127:
-                raise USBProxyNotInstalled(
-                    "qubes-usb-proxy not installed in the VM")
-            elif p.returncode != 0:
-                # TODO: sanitize and include stdout
-                sanitized_stderr = ''.join(
-                    [c for c in stderr if ord(c) >= 0x20])
-                raise QubesUSBException(
-                    'Device attach failed: {}'.format(sanitized_stderr))
+            try:
+                yield from vm.run_service_for_stdio('qubes.USBAttach',
+                    user='root',
+                    input='{} {}\n'.format(device.backend_domain.name,
+                        device.ident).encode())
+            except subprocess.CalledProcessError as e:
+                if e.returncode == 127:
+                    raise USBProxyNotInstalled(
+                        "qubes-usb-proxy not installed in the VM")
+                else:
+                    # TODO: sanitize and include stdout
+                    sanitized_stderr = ''.join(
+                        [chr(c) for c in e.stderr if 0x20 <= c < 0x80])
+                    raise QubesUSBException(
+                        'Device attach failed: {}'.format(sanitized_stderr))
         finally:
             # FIXME: there is a race condition here - some other process might
             # modify the file in the meantime. This may result in unexpected
@@ -223,6 +232,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                     f.write(''.join(policy))
 
     @qubes.ext.handler('device-detach:usb')
+    @asyncio.coroutine
     def on_device_detach_usb(self, vm, event, device):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running() or vm.qid == 0:
@@ -238,18 +248,19 @@ class USBDeviceExtension(qubes.ext.Extension):
                 "Device {!s} not connected to VM {}".format(
                     device, vm.name))
 
-        p = device.backend_domain.run_service('qubes.USBDetach',
-            passio_popen=True,
-            user='root')
-        (stdout, stderr) = p.communicate(
-            '{}\n'.format(device.ident))
-        if p.returncode != 0:
+        try:
+            yield from device.backend_domain.run_service_for_stdio(
+                'qubes.USBDetach',
+                user='root',
+                input='{}\n'.format(device.ident).encode())
+        except subprocess.CalledProcessError as e:
             # TODO: sanitize and include stdout
             raise QubesUSBException('Device detach failed')
 
     @qubes.ext.handler('domain-start')
+    @asyncio.coroutine
     def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
         for assignment in vm.devices['usb'].assignments(persistent=True):
             device = assignment.device
-            self.on_device_attach_usb(vm, '', device)
+            yield from self.on_device_attach_usb(vm, '', device)
