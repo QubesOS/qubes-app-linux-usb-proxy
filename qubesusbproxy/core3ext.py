@@ -53,7 +53,7 @@ class USBDevice(qubes.devices.DeviceInfo):
             if not self.backend_domain.is_running():
                 # don't cache this value
                 return "Unknown - domain not running"
-            untrusted_device_desc = self.backend_domain.qdb.read(
+            untrusted_device_desc = self.backend_domain.untrusted_qdb.read(
                 self._qdb_path + '/desc')
             self._description = self._sanitize_desc(untrusted_device_desc)
         return self._description
@@ -62,7 +62,7 @@ class USBDevice(qubes.devices.DeviceInfo):
     def frontend_domain(self):
         if not self.backend_domain.is_running():
             return None
-        untrusted_connected_to = self.backend_domain.qdb.read(
+        untrusted_connected_to = self.backend_domain.untrusted_qdb.read(
             self._qdb_path + '/connected-to'
         )
         if not untrusted_connected_to:
@@ -111,7 +111,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         if not vm.is_running() or not hasattr(vm, 'qdb'):
             return
 
-        untrusted_dev_list = vm.qdb.list('/qubes-usb-devices/')
+        untrusted_dev_list = vm.untrusted_qdb.list('/qubes-usb-devices/')
         if not untrusted_dev_list:
             return
         # just get list of devices, not its every property
@@ -131,7 +131,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running():
             return
-        if vm.qdb.list('/qubes-usb-devices/' + ident.replace('.', '_')):
+        if vm.untrusted_qdb.list(
+                        '/qubes-usb-devices/' + ident.replace('.', '_')):
             yield USBDevice(vm, ident)
 
     @staticmethod
