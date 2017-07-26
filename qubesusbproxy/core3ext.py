@@ -31,7 +31,7 @@ import errno
 import qubes.devices
 import qubes.ext
 
-usb_device_re = re.compile(br"^[0-9]+-[0-9]+(_[0-9]+)*$")
+usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
 usb_connected_to_re = re.compile(br"^[a-zA-Z][a-zA-Z0-9_.-]*$")
 
@@ -116,14 +116,12 @@ class USBDeviceExtension(qubes.ext.Extension):
             return
         # just get list of devices, not its every property
         untrusted_dev_list = \
-            set(path.split(b'/')[2] for path in untrusted_dev_list)
+            set(path.split('/')[2] for path in untrusted_dev_list)
         for untrusted_qdb_ident in untrusted_dev_list:
             if not usb_device_re.match(untrusted_qdb_ident):
                 vm.log.warning('Invalid USB device name detected')
                 continue
-            ident = untrusted_qdb_ident.\
-                decode('ascii', errors='strict').\
-                replace('_', '.')
+            ident = untrusted_qdb_ident.replace('_', '.')
             yield USBDevice(vm, ident)
 
     @qubes.ext.handler('device-get:usb')
