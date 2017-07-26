@@ -104,6 +104,18 @@ class QubesUSBException(qubes.exc.QubesException):
 
 
 class USBDeviceExtension(qubes.ext.Extension):
+    @qubes.ext.handler('domain-init', 'domain-load')
+    def on_domain_init_load(self, vm, event):
+        '''Initialize watching for changes'''
+        # pylint: disable=unused-argument,no-self-use
+        vm.watch_qdb_path('/qubes-usb-devices')
+
+    @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
+    def on_qdb_change(self, vm, event, path):
+        '''A change in QubesDB means a change in device list'''
+        # pylint: disable=unused-argument,no-self-use
+        vm.fire_event('device-list-change:usb')
+
     @qubes.ext.handler('device-list:usb')
     def on_device_list_usb(self, vm, event):
         # pylint: disable=unused-argument,no-self-use
