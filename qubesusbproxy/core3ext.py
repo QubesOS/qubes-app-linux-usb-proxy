@@ -120,7 +120,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     def on_device_list_usb(self, vm, event):
         # pylint: disable=unused-argument,no-self-use
 
-        if not vm.is_running() or not hasattr(vm, 'qdb'):
+        if not vm.is_running() or not hasattr(vm, 'untrusted_qdb'):
             return
 
         untrusted_dev_list = vm.untrusted_qdb.list('/qubes-usb-devices/')
