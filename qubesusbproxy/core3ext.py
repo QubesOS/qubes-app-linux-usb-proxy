@@ -34,7 +34,7 @@ import qubes.ext
 usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
 usb_connected_to_re = re.compile(br"^[a-zA-Z][a-zA-Z0-9_.-]*$")
-
+usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
 
 class USBDevice(qubes.devices.DeviceInfo):
     # pylint: disable=too-few-public-methods
@@ -56,6 +56,10 @@ class USBDevice(qubes.devices.DeviceInfo):
             untrusted_device_desc = self.backend_domain.untrusted_qdb.read(
                 self._qdb_path + '/desc')
             self._description = self._sanitize_desc(untrusted_device_desc)
+            hw_ident_match = usb_device_hw_ident_re.match(self._description)
+            if hw_ident_match:
+                self._description = self._description[
+                    len(hw_ident_match.group(0)):]
         return self._description
 
     @property
@@ -89,7 +93,7 @@ class USBDevice(qubes.devices.DeviceInfo):
         untrusted_device_desc = untrusted_device_desc.decode('ascii',
             errors='strict')
         safe_set = set(string.ascii_letters + string.digits +
-                       string.punctuation)
+                       string.punctuation + ' ')
         return ''.join(
             c if c in safe_set else '_' for c in untrusted_device_desc
         )
