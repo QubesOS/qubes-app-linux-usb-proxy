@@ -1,3 +1,11 @@
+qubes-usb-proxy (1.0.9) unstable; urgency=medium
+
+  * Follow vm.qdb -> vm.untrusted_qdb rename
+  * core3: follow change of qdb.list return type
+  * core3: translate QubesDB changes into device-list-change event
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sat, 29 Jul 2017 05:35:00 +0200
+
 qubes-usb-proxy (1.0.8) unstable; urgency=medium
 
   * Do not use sudo if already running as root
