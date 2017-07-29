@@ -1,3 +1,10 @@
+qubes-usb-proxy (1.0.10) unstable; urgency=medium
+
+  * core3: fix qdb->untrusted_qdb in one more place
+  * core3: hide device hardware id ni description
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sat, 29 Jul 2017 14:27:49 +0200
+
 qubes-usb-proxy (1.0.9) unstable; urgency=medium
 
   * Follow vm.qdb -> vm.untrusted_qdb rename
