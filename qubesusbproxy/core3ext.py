@@ -91,7 +91,7 @@ class USBDevice(qubes.devices.DeviceInfo):
     @staticmethod
     def _sanitize_desc(untrusted_device_desc):
         untrusted_device_desc = untrusted_device_desc.decode('ascii',
-            errors='strict')
+            errors='ignore')
         safe_set = set(string.ascii_letters + string.digits +
                        string.punctuation + ' ')
         return ''.join(
