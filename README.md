@@ -4,6 +4,40 @@ USB proxy based on USBIP and qrexec
 USB device passthrough using USBIP as a protocol, but qrexec as link layer.
 See https://github.com/QubesOS/qubes-issues/issues/531 for more details.
 
+Installation
+------------
+
+If you get this error: `ERROR: qubes-usb-proxy not installed in the VM` when running `qvm-usb -a`,
+you might want to consider installing this repository inside your VM.
+
+To do this, follow these steps:
+
+1. Download a version of this repository from the [releases].
+   In this case, we use version v1.0.11. You might want to use a later version.
+   ```shell
+   wget https://github.com/QubesOS/qubes-app-linux-usb-proxy/archive/v1.0.11.tar.gz
+   ```
+   **Note:** We use the `.tar.gz` version as the `tar` command is already installed
+   whereas `unzip` needs to be installed separately.
+   **Note:** If you use this in a Template VM, you need edit your firewall rules to
+   allow access for five minutes.
+2. Extract the content.
+   ```shell
+   tar -xf v1.0.11.tar.gz
+   ```
+3. Go to the directory `qubes-app-linux-usb-proxy-1.0.11`:
+   ```shell
+   cd qubes-app-linux-usb-proxy-*
+   ```
+   If you do `ls`, you should see about the same contents as in this folder and this file.
+4. Install the `qubes-usb-proxy`.
+   ```
+   sudo make install-vm
+   ```
+5. Now, restart or shutdown your VM. If you used a Template VM for this, restart your
+   App VM once the Template VM has shut down.
+   
+[releases]: https://github.com/QubesOS/qubes-app-linux-usb-proxy/releases
 
 Technical details of USBIP
 --------------------------
