@@ -14,6 +14,17 @@ usage() {
     echo "$0 statefile"
 }
 
+ERROR() {
+  (
+    echo "$@ "
+    echo "VM: \"`hostname`\" File: \"$0\" "
+    echo "Version Control: "
+    echo -n "https://github.com/QubesOS/qubes-app-linux-usb-proxy"
+    echo "/blob/master/src/usb-import"
+  ) >&2;
+  exit 1
+}
+
 if [ "$#" -lt 1 ]; then
     usage
     exit 1
@@ -39,8 +50,7 @@ find_port() {
             return 0
         fi
     done < $DEVPATH/status
-    echo "No unused port found!" >&2
-    exit 1
+    ERROR "No unused port found!"
 }
 
 attach() {
@@ -72,15 +82,20 @@ case "$untrusted_speed" in
     480) speed=3 ;; # High Speed
     53.3-480) speed=4 ;; # Wireless
     5000) speed=5 ;; # Super Speed
-    *) echo "Invalid speed received" >&2; exit 1 ;;
+    *) ERROR "Invalid speed \"$untrusted_speed\" received." \
+             "Expected \"1.5\", \"12\", \"480\", \"53.3-480\" or \"5000\"." \
+             "If the remote side sent nothing, this could mean "\
+             "  - the device is invalid or unplugged" \
+             "  - the VM crashed" \
+             "  - qubes-usb-proxy is not installed" \
+             "  - ...";;
 esac
-
 # 32bit integer
 if [ "$untrusted_devid" -ge 0 -a "$untrusted_devid" -lt 4294967296 ]; then
     devid="$untrusted_devid"
 else
-    echo "Invalid devid" >&2
-    exit 1
+    ERROR "Invalid devid \"$untrusted_devid\"." \
+          "Expected 0 <= devid < 4294967296."
 fi
 
 port=$(find_port)
