@@ -278,4 +278,4 @@ class USBDeviceExtension(qubes.ext.Extension):
         # pylint: disable=unused-argument
         for assignment in vm.devices['usb'].assignments(persistent=True):
             device = assignment.device
-            yield from self.on_device_attach_usb(vm, '', device)
+            yield from self.on_device_attach_usb(vm, '', device, options={})
