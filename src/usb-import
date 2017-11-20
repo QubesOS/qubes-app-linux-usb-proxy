@@ -66,6 +66,12 @@ wait_for_attached() {
 # negotiate parameters (field 'extra' reserved for future use)
 read untrusted_devid untrusted_speed untrusted_extra
 
+# check for unexpected EOF
+if [ -z "$untrusted_devid" -a -z "$untrusted_speed" ]; then
+    echo "No device info received, connection failed, check backend side for details" >&2
+    exit 1
+fi
+
 case "$untrusted_speed" in
     1.5) speed=1 ;; # Low Speed
     12)  speed=2 ;; # Full speed
