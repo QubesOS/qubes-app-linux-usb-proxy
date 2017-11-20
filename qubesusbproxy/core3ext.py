@@ -55,6 +55,8 @@ class USBDevice(qubes.devices.DeviceInfo):
                 return "Unknown - domain not running"
             untrusted_device_desc = self.backend_domain.untrusted_qdb.read(
                 self._qdb_path + '/desc')
+            if not untrusted_device_desc:
+                return 'Unknown'
             self._description = self._sanitize_desc(untrusted_device_desc)
             hw_ident_match = usb_device_hw_ident_re.match(self._description)
             if hw_ident_match:
