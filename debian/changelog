@@ -1,3 +1,15 @@
+qubes-usb-proxy (1.0.12) unstable; urgency=medium
+
+  [ Nedyalko Andreev ]
+  * Add a simple PKGBUILD file for archlinux builds
+
+  [ Marek Marczykowski-Górecki ]
+  * Fix VM startup with USB device assigned (core3)
+  * core3: do not fail listing on devices without description
+  * Improve error message when backend fails to send device info
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Tue, 21 Nov 2017 05:07:11 +0100
+
 qubes-usb-proxy (1.0.11) unstable; urgency=medium
 
   * core3: ignore non-ascii characters in device description
