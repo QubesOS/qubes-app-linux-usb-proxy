@@ -3,6 +3,9 @@
 modprobe vhci-hcd || exit 1
 
 DEVPATH="/sys/devices/platform/vhci_hcd"
+if [ -d "${DEVPATH}.0" ]; then
+    DEVPATH="${DEVPATH}.0"
+fi
 
 # From /usr/include/linux/usbip.h
 VDEV_ST_NULL=4
