@@ -24,7 +24,11 @@ else
         exit 1
     fi
     port=$(cat "$statefile")
-    port_status=$(grep "^$port" $DEVPATH/status)
+    port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
+    if [ -z "$port_status" ]; then
+        echo "Failed to find USB port '$port'" >&2
+        exit 1
+    fi
     local_busid=${port_status##* }
     echo $port > $DEVPATH/detach && rm $statefile
     while [ -e /sys/bus/usb/devices/$local_busid ]; do

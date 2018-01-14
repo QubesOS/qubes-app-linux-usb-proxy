@@ -33,12 +33,29 @@ fi
 
 # based on linux/tools/usb/usbip/libsrc/vhci_driver.c
 find_port() {
-    while read prt sta spd bus dev socket local_busid extra; do
-        if [ "$prt" = "prt" ]; then
-            # header
+    # "hs" for high-speed and "ss" for super-speed
+    requested_hub="$1"
+    old_header=
+    while read hub port sta spd bus dev socket local_busid extra; do
+        if [ "$hub" = "port" ]; then
+            # old header:
+            #   port sta spd bus dev socket local_busid
+            if [ "$requested_hub" = "ss" ]; then
+                echo "USB SuperSpeed require kernel >= 4.13" >&2
+                exit 1
+            fi
+            old_header=1
             continue
-        elif [ "$sta" -eq $VDEV_ST_NULL ]; then
-            echo $prt
+        elif [ "$hub" = "hub" ]; then
+            # new header
+            #   hub port sta spd bus dev socket local_busid
+            continue
+        elif [ -n "$old_header" ] && [ "$port" -eq $VDEV_ST_NULL ]; then
+            # port column in old header
+            echo $hub
+            return 0
+        elif [ -z "$old_header" ] && [ "$hub" = "$requested_hub" ] && [ "$sta" -eq $VDEV_ST_NULL ]; then
+            echo $port
             return 0
         fi
     done < $DEVPATH/status
@@ -59,7 +76,7 @@ wait_for_attached() {
     local local_busid="0-0"
     while [ ! -e /sys/bus/usb/devices/$local_busid ]; do
         sleep 0.2
-        port_status=$(grep "^$port" $DEVPATH/status)
+        port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
         local_busid=${port_status##* }
     done
     udevadm settle
@@ -92,7 +109,12 @@ else
     exit 1
 fi
 
-port=$(find_port)
+if [ "$speed" -ge 5 ]; then
+    hub_type="ss"
+else
+    hub_type="hs"
+fi
+port=$(find_port $hub_type)
 
 # Request that both IN and OUT be handled on a single (stdin) socket
 kill -USR1 "$QREXEC_AGENT_PID" || exit 1
