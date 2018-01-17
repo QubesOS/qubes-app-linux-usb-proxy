@@ -31,6 +31,9 @@ make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
 %dir %{python3_sitelib}/qubesusbproxy-*.egg-info
 %{python3_sitelib}/qubesusbproxy-*.egg-info/*
 %{python3_sitelib}/qubesusbproxy
+%dir %{python_sitelib}/qubesusbproxy-*.egg-info
+%{python_sitelib}/qubesusbproxy-*.egg-info/*
+%{python_sitelib}/qubesusbproxy
 
 
 %changelog

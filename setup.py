@@ -23,17 +23,31 @@
 #
 
 from setuptools import setup
+import sys
 
-setup(
-    name='qubesusbproxy',
-    version=open('version').read().strip(),
-    packages=['qubesusbproxy'],
-    entry_points={
-        'qubes.tests.extra.for_template':
-            'usbproxy = qubesusbproxy.tests:list_tests',
-        'qubes.ext':
-            'usbproxy = qubesusbproxy.core3ext:USBDeviceExtension',
-        'qubes.devices':
-            'usb = qubesusbproxy.core3ext:USBDevice',
-    }, install_requires=['lxml']
-)
+if sys.version_info < (3,):
+    # don't install core3 extension
+    setup(
+        name='qubesusbproxy',
+        version=open('version').read().strip(),
+        packages=['qubesusbproxy'],
+        entry_points={
+            'qubes.tests.extra.for_template':
+                'usbproxy = qubesusbproxy.tests:list_tests',
+        },
+    )
+else:
+    # install tests and core3 extension
+    setup(
+        name='qubesusbproxy',
+        version=open('version').read().strip(),
+        packages=['qubesusbproxy'],
+        entry_points={
+            'qubes.tests.extra.for_template':
+                'usbproxy = qubesusbproxy.tests:list_tests',
+            'qubes.ext':
+                'usbproxy = qubesusbproxy.core3ext:USBDeviceExtension',
+            'qubes.devices':
+                'usb = qubesusbproxy.core3ext:USBDevice',
+        }, install_requires=['lxml']
+    )
