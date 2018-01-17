@@ -41,6 +41,7 @@ except ImportError:
 
 
 GADGET_PREREQ = '&&'.join([
+    "modprobe dummy_hcd",
     "modprobe usb_f_mass_storage",
     "mount|grep -q configfs",
     "test -d /sys/class/udc/dummy_udc.0",
