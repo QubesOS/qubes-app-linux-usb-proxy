@@ -1,3 +1,14 @@
+qubes-usb-proxy (1.0.13) unstable; urgency=medium
+
+  * Fix device path for kernel >= 4.13
+  * Add support for USB3
+  * tests: mark attach_not_installed_back with expectedFailure
+  * tests: install python modules for both python2 and python3
+  * tests: load dummy-hcd module
+  * tests: update core3 tests for the final API and python3
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 18 Jan 2018 17:37:01 +0100
+
 qubes-usb-proxy (1.0.12) unstable; urgency=medium
 
   [ Nedyalko Andreev ]
