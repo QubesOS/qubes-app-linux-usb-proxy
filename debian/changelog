@@ -1,3 +1,9 @@
+qubes-usb-proxy (1.0.14) unstable; urgency=medium
+
+  * Fix handling SuperSpeed port numbers
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 19 Jan 2018 04:36:01 +0100
+
 qubes-usb-proxy (1.0.13) unstable; urgency=medium
 
   * Fix device path for kernel >= 4.13
