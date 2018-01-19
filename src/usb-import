@@ -68,7 +68,7 @@ attach() {
     local remote_devid="$2"
     local speed="$3"
     # port sockfd devid speed
-    printf "%u %u %u %u" "$port" "0" "$remote_devid" "$speed" > $DEVPATH/attach
+    printf "%s %u %u %u" "$port" "0" "$remote_devid" "$speed" > $DEVPATH/attach
 }
 
 wait_for_attached() {
