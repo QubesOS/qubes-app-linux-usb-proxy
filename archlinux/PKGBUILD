@@ -5,7 +5,7 @@ pkgdesc="The Qubes service for proxying USB devices"
 arch=("x86_64")
 url="http://qubes-os.org/"
 license=('GPL')
-depends=('sh' 'qubes-vm-core')
+depends=('sh' 'qubes-vm-core' 'usbutils')
 makedepends=(pkg-config make gcc)
 
 changelog=debian/changelog

@@ -8,7 +8,7 @@ Homepage:  http://www.qubes-os.org
 
 Package: qubes-usb-proxy
 Architecture: any
-Depends: ${shlibs:Depends}, qubes-core-agent(>=3.2.0)
+Depends: ${shlibs:Depends}, qubes-core-agent(>=3.2.0), usbutils
 Description: USBIP wrapper to run it over Qubes RPC connection
  This package wraps USBIP connection in Qubes RPC, which makes it possible to
  passthrough USB device between qubes, without enabling networking between

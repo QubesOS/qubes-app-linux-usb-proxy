@@ -12,6 +12,7 @@ Group:		System
 License:	GPLv2
 URL:		https://www.qubes-os.org/
 BuildArch:  noarch
+Requires:   usbutils
 
 %description
 USBIP wrapper to run it over Qubes RPC connection
