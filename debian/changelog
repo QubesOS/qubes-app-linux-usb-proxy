@@ -1,3 +1,9 @@
+qubes-usb-proxy (1.0.15) unstable; urgency=medium
+
+  * Depends on usbutils
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Mon, 22 Jan 2018 21:31:56 +0100
+
 qubes-usb-proxy (1.0.14) unstable; urgency=medium
 
   * Fix handling SuperSpeed port numbers
