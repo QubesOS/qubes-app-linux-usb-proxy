@@ -30,6 +30,7 @@ import errno
 
 import qubes.devices
 import qubes.ext
+import qubes.vm.adminvm
 
 usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
@@ -110,6 +111,14 @@ class QubesUSBException(qubes.exc.QubesException):
 
 
 class USBDeviceExtension(qubes.ext.Extension):
+
+    def __init__(self):
+        super(USBDeviceExtension, self).__init__()
+        #include dom0 devices in listing only when usb-proxy is really
+        # installed there
+        self.usb_proxy_installed_in_dom0 = os.path.exists(
+            '/etc/qubes-rpc/qubes.USB')
+
     @qubes.ext.handler('domain-init', 'domain-load')
     def on_domain_init_load(self, vm, event):
         '''Initialize watching for changes'''
@@ -127,6 +136,10 @@ class USBDeviceExtension(qubes.ext.Extension):
         # pylint: disable=unused-argument,no-self-use
 
         if not vm.is_running() or not hasattr(vm, 'untrusted_qdb'):
+            return
+
+        if isinstance(vm, qubes.vm.adminvm.AdminVM) and not \
+                self.usb_proxy_installed_in_dom0:
             return
 
         untrusted_dev_list = vm.untrusted_qdb.list('/qubes-usb-devices/')
