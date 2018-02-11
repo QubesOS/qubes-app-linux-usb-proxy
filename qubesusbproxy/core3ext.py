@@ -185,7 +185,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             if dev.frontend_domain == vm:
                 yield (dev, {})
 
-    @qubes.ext.handler('device-attach:usb')
+    @qubes.ext.handler('device-pre-attach:usb')
     @asyncio.coroutine
     def on_device_attach_usb(self, vm, event, device, options):
         # pylint: disable=unused-argument
@@ -261,7 +261,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                     f.seek(0)
                     f.write(''.join(policy))
 
-    @qubes.ext.handler('device-detach:usb')
+    @qubes.ext.handler('device-pre-detach:usb')
     @asyncio.coroutine
     def on_device_detach_usb(self, vm, event, device):
         # pylint: disable=unused-argument,no-self-use
