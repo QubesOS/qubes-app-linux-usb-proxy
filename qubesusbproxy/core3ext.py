@@ -294,3 +294,9 @@ class USBDeviceExtension(qubes.ext.Extension):
         for assignment in vm.devices['usb'].assignments(persistent=True):
             device = assignment.device
             yield from self.on_device_attach_usb(vm, '', device, options={})
+
+    @qubes.ext.handler('domain-shutdown')
+    @asyncio.coroutine
+    def on_domain_shutdown(self, vm, _event, **_kwargs):
+        # pylint: disable=unused-argument
+        vm.fire_event('device-list-change:usb')
