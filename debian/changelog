@@ -1,3 +1,11 @@
+qubes-usb-proxy (1.0.16) unstable; urgency=medium
+
+  * core3ext: do not include dom0 devices by default
+  * core3ext: attach devices in -pre event
+  * core3ext: send device-list-change event on backend domain shutdown
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Tue, 13 Feb 2018 05:17:46 +0100
+
 qubes-usb-proxy (1.0.15) unstable; urgency=medium
 
   * Depends on usbutils
