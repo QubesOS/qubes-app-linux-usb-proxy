@@ -37,7 +37,7 @@ find_port() {
     requested_hub="$1"
     old_header=
     while read hub port sta spd bus dev socket local_busid extra; do
-        if [ "$hub" = "port" ]; then
+        if [ "$hub" = "port" ] || [ "$hub" = "prt" ]; then
             # old header:
             #   port sta spd bus dev socket local_busid
             if [ "$requested_hub" = "ss" ]; then
