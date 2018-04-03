@@ -35,4 +35,4 @@ make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
 %{python_sitelib}/qubesusbproxy
 
 %changelog
-
+@CHANGELOG@

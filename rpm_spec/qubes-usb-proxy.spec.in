@@ -30,4 +30,4 @@ make install-vm DESTDIR=${RPM_BUILD_ROOT}
 /usr/lib/qubes/usb-export
 
 %changelog
-
+@CHANGELOG@
