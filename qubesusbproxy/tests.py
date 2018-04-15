@@ -453,6 +453,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
             self.loop.run_until_complete(
                 self.frontend.devices['usb'].attach(ass))
 
+    @unittest.expectedFailure
     def test_075_attach_not_installed_back(self):
         self.frontend.start()
         # simulate package not installed
@@ -461,9 +462,13 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         if retcode != 0:
             raise RuntimeError("Failed to simulate not installed package")
         ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
-        with self.assertRaises(qubesusbproxy.core3ext.USBProxyNotInstalled):
-            self.loop.run_until_complete(
-                self.frontend.devices['usb'].attach(ass))
+        try:
+            with self.assertRaises(qubesusbproxy.core3ext.USBProxyNotInstalled):
+                self.loop.run_until_complete(
+                    self.frontend.devices['usb'].attach(ass))
+        except qubesusbproxy.core3ext.QubesUSBException as e:
+            self.fail('Generic exception raise instead of specific '
+                      'USBProxyNotInstalled: ' + str(e))
 
 
 def list_tests():
