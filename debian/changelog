@@ -1,3 +1,14 @@
+qubes-usb-proxy (1.0.18) unstable; urgency=medium
+
+  [ Marek Marczykowski-Górecki ]
+  * tests: mark attach_not_installed_back with expectedFailure
+
+  [ Frédéric Pierret ]
+  * Create .spec.in and Source0
+  * spec.in: add changelog placeholder
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Mon, 07 May 2018 19:53:03 +0200
+
 qubes-usb-proxy (1.0.17) unstable; urgency=medium
 
   * Restore workaround for typo in usbip port status header
