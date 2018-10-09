@@ -98,6 +98,8 @@ def remove_usb_gadget(vm):
 
 class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
     def setUp(self):
+        if 'whonix-gw' in self.template:
+            self.skipTest('whonix-gw does not have qubes-usb-proxy')
         super(TC_00_USBProxy, self).setUp()
         vms = self.create_vms(["backend", "frontend"])
         (self.backend, self.frontend) = vms
