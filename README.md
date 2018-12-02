@@ -4,6 +4,12 @@ USB proxy based on USBIP and qrexec
 USB device passthrough using USBIP as a protocol, but qrexec as link layer.
 See https://github.com/QubesOS/qubes-issues/issues/531 for more details.
 
+Installation
+------------
+
+If you want to install `qubes-app-linux-usb-proxy` not for development but for usage,
+please refer to the [USB Documentation of Qubes][documentation-usb]
+to install it securely with your package manager.
 
 Technical details of USBIP
 --------------------------
@@ -96,3 +102,5 @@ Using python API it will be:
     frontend_vm.run_service('qubes.USBDetach', input='sys-usb 2-1', user='root')
 
     backend_vm.run_service('qubes.USBDetach', input='2-1', user='root')
+
+[documentation-usb]: https://www.qubes-os.org/doc/usb/
