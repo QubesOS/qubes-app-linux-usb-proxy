@@ -30,6 +30,7 @@ core3 = False
 try:
     import qubesusbproxy.core3ext
     import qubes.devices
+    import asyncio
     core3 = True
 except ImportError:
     pass
@@ -78,7 +79,7 @@ def create_usb_gadget(vm):
         passio_popen=True, passio_stderr=True)
     (_, stderr) = p.communicate()
     if p.returncode != 0:
-        raise RuntimeError("Failed to setup USB gadget: " + stderr)
+        raise RuntimeError("Failed to setup USB gadget: " + stderr.decode())
     p = vm.run(
         'ls /sys/bus/platform/devices/dummy_hcd.0/usb*|grep -x .-.',
         passio_popen=True)
@@ -95,6 +96,26 @@ def remove_usb_gadget(vm):
         user="root", wait=True)
     if retcode != 0:
         raise RuntimeError("Failed to disable USB gadget")
+
+def recreate_usb_gadget(vm):
+    '''Re-create the gadget previously created with *create_usb_gadget*,
+    then removed with *remove_usb_gadget*.
+    '''
+
+    reconnect = ";".join([
+        "cd /sys/kernel/config/usb_gadget",
+        "mkdir test_g1; cd test_g1",
+        "echo dummy_udc.0 > UDC",
+        "sleep 2; udevadm settle",
+        ])
+
+
+    p = vm.run(reconnect, user="root",
+        passio_popen=True, passio_stderr=True)
+    (_, stderr) = p.communicate()
+    if p.returncode != 0:
+        raise RuntimeError("Failed to re-create USB gadget: " + stderr.decode())
+
 
 class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
     def setUp(self):
@@ -436,12 +457,42 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
         remove_usb_gadget(self.backend)
         # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(1)
+        self.loop.run_until_complete(asyncio.sleep(1))
 
         self.assertNotIn(self.usbdev_name, [str(dev) for dev in usb_list])
         self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
             wait=True), 0,
             "Device disconnection failed")
+
+    def test_061_auto_attach_on_reconnect(self):
+        self.frontend.start()
+        usb_list = self.backend.devices['usb']
+        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident,
+            persistent=True)
+        try:
+            self.loop.run_until_complete(
+                self.frontend.devices['usb'].attach(ass))
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        remove_usb_gadget(self.backend)
+        # FIXME: usb-export script may update qubesdb with 1sec delay
+        timeout = 5
+        while self.usbdev_name in (str(dev) for dev in usb_list):
+            self.loop.run_until_complete(asyncio.sleep(1))
+            timeout -= 1
+            self.assertGreater(timeout, 0, 'timeout on device remove')
+
+        recreate_usb_gadget(self.backend)
+        timeout = 5
+        while self.usbdev_name not in (str(dev) for dev in usb_list):
+            self.loop.run_until_complete(asyncio.sleep(1))
+            timeout -= 1
+            self.assertGreater(timeout, 0, 'timeout on device create')
+        self.loop.run_until_complete(asyncio.sleep(1))
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device reconnection failed")
 
     def test_070_attach_not_installed_front(self):
         self.frontend.start()
