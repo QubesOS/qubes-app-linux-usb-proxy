@@ -118,18 +118,45 @@ class USBDeviceExtension(qubes.ext.Extension):
         # installed there
         self.usb_proxy_installed_in_dom0 = os.path.exists(
             '/etc/qubes-rpc/qubes.USB')
+        self.devices_cache = {}
 
     @qubes.ext.handler('domain-init', 'domain-load')
     def on_domain_init_load(self, vm, event):
         '''Initialize watching for changes'''
         # pylint: disable=unused-argument,no-self-use
         vm.watch_qdb_path('/qubes-usb-devices')
+        self.devices_cache[vm.name] = set()
+
+    @asyncio.coroutine
+    def _attach_and_notify(self, vm, device, options):
+        # bypass DeviceCollection logic preventing double attach
+        yield from self.on_device_attach_usb(vm,
+            'device-pre-attach:usb', device, options)
+        yield from vm.fire_event_async('device-attach:usb',
+                device=device,
+                options=options)
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
         '''A change in QubesDB means a change in device list'''
         # pylint: disable=unused-argument,no-self-use
         vm.fire_event('device-list-change:usb')
+        current_devices = set(dev.ident
+            for dev in self.on_device_list_usb(vm, None))
+        new_devices = set()
+        for dev in current_devices:
+            if dev not in self.devices_cache[vm.name]:
+                new_devices.add(dev)
+        self.devices_cache[vm.name] = current_devices
+        for front_vm in vm.app.domains:
+            if not front_vm.is_running():
+                continue
+            for assignment in front_vm.devices['usb'].assignments(
+                    persistent=True):
+                if assignment.backend_domain == vm and \
+                        assignment.ident in new_devices:
+                    asyncio.ensure_future(self._attach_and_notify(
+                        front_vm, assignment.device, assignment.options))
 
     @qubes.ext.handler('device-list:usb')
     def on_device_list_usb(self, vm, event):
