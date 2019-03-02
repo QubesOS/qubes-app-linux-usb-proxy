@@ -13,14 +13,14 @@ BuildRequires:	python2-devel
 # do not require specific python verison, should be pulled in by relevant core
 # package
 
-Source0: %{name}-%{version}.tar.gz
+Source0: qubes-usb-proxy-%{version}.tar.gz
 
 %description
 Dom0 files for Qubes USBIP wrapper. This includes Qubes tools integration.
 This package also contains tests.
 
 %prep
-%setup -q
+%setup -q -n qubes-usb-proxy-%{version}
 
 %install
 make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
@@ -30,9 +30,9 @@ make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
 %dir %{python3_sitelib}/qubesusbproxy-*.egg-info
 %{python3_sitelib}/qubesusbproxy-*.egg-info/*
 %{python3_sitelib}/qubesusbproxy
-%dir %{python_sitelib}/qubesusbproxy-*.egg-info
-%{python_sitelib}/qubesusbproxy-*.egg-info/*
-%{python_sitelib}/qubesusbproxy
+%dir %{python2_sitelib}/qubesusbproxy-*.egg-info
+%{python2_sitelib}/qubesusbproxy-*.egg-info/*
+%{python2_sitelib}/qubesusbproxy
 
 %changelog
 @CHANGELOG@
