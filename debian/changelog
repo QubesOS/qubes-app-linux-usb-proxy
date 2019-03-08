@@ -1,3 +1,17 @@
+qubes-usb-proxy (1.0.20) unstable; urgency=medium
+
+  [ Nicco Kunzmann ]
+  * Clarify how to install this package sucurely
+  * Add error message with source
+
+  [ Marek Marczykowski-Górecki ]
+  * Automatically re-connect persistent device when it gets plugged back
+  * tests: verify automatic re-connection of the device
+  * rpm: fix dom0 spec file
+  * travis: add R4.1
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 08 Mar 2019 03:01:30 +0100
+
 qubes-usb-proxy (1.0.19) unstable; urgency=medium
 
   * tests: skip test for whonix-gw
