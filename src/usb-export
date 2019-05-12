@@ -85,17 +85,14 @@ modprobe usbip-host || exit 1
 kill -USR1 "$QREXEC_AGENT_PID" || exit 1
 
 busid=$(basename "$devpath")
-# Unbind the device from other drivers
-if [ -d "$devpath/driver" -a \
-        "$(readlink -f $devpath/driver)" != "$SYS_USBIP_HOST" ]; then
+# Unbind the device from the driver
+if [ -d "$devpath/driver" ]; then
     echo $busid > $devpath/driver/unbind || exit 1
 fi
 
-# Bind to the usbip-host driver if needed
-if ! [ -e $SYS_USBIP_HOST/$busid ]; then
-    echo -n add $busid > $SYS_USBIP_HOST/match_busid || exit 1
-    echo $busid > $SYS_USBIP_HOST/bind || exit 1
-fi
+# Bind to the usbip-host driver
+echo -n add $busid > $SYS_USBIP_HOST/match_busid || exit 1
+echo $busid > $SYS_USBIP_HOST/bind || exit 1
 
 # One more safety check - make sure the device is available
 if [ "$(cat $devpath/usbip_status)" -ne $SDEV_ST_AVAILABLE ]; then
