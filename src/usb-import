@@ -109,7 +109,12 @@ case "$untrusted_speed" in
     53.3-480) speed=4 ;; # Wireless
     5000) speed=5 ;; # Super Speed
     *) ERROR "Invalid speed \"$untrusted_speed\" received." \
-             "Expected \"1.5\", \"12\", \"480\", \"53.3-480\" or \"5000\"";;
+             "Expected \"1.5\", \"12\", \"480\", \"53.3-480\" or \"5000\". " \
+             "If the remote side sent nothing, this could mean "\
+             "  - the device is invalid or unplugged" \
+             "  - the VM crashed" \
+             "  - qubes-usb-proxy is not installed" \
+             "  - ...";;
 esac
 # 32bit integer
 if [ "$untrusted_devid" -ge 0 -a "$untrusted_devid" -lt 4294967296 ]; then
