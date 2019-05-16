@@ -1,3 +1,14 @@
+qubes-usb-proxy (1.0.21) unstable; urgency=medium
+
+  [ Malte Leip ]
+  * usb-export: always unbind from current driver
+
+  [ Nicco Kunzmann ]
+  * Add error message with source
+  * Clarify how to install this package securely
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 16 May 2019 20:12:29 +0200
+
 qubes-usb-proxy (1.0.20) unstable; urgency=medium
 
   [ Nicco Kunzmann ]
