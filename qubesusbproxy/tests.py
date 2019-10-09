@@ -523,6 +523,16 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
             self.fail('Generic exception raise instead of specific '
                       'USBProxyNotInstalled: ' + str(e))
 
+    def test_080_attach_existing_policy(self):
+        self.frontend.start()
+        # this override policy file, but during normal execution it shouldn't
+        # exist, so should be ok, especially on testing system
+        with open('/etc/qubes-rpc/policy/qubes.USB+{}'.format(self.usbdev_ident), 'w+') as policy_file:
+            policy_file.write('# empty policy\n')
+        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        self.loop.run_until_complete(
+            self.frontend.devices['usb'].attach(ass))
+
 
 def list_tests():
     tests = [TC_00_USBProxy]

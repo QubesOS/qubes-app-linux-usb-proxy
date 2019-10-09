@@ -21,12 +21,15 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 import asyncio
+import fcntl
+import grp
 import os
 import re
 import string
 import subprocess
 
 import errno
+import tempfile
 
 import qubes.devices
 import qubes.ext
@@ -108,6 +111,58 @@ class USBProxyNotInstalled(qubes.exc.QubesException):
 
 class QubesUSBException(qubes.exc.QubesException):
     pass
+
+
+def modify_qrexec_policy(service, line, add):
+    """
+    Add/remove *line* to qrexec policy of a *service*.
+    If policy file is missing, it is created. If resulting policy would be
+    empty, it is removed.
+
+    :param service: service name
+    :param line: line to add/remove
+    :param add: True if line should be added, otherwise False
+    :return: None
+    """
+    path = '/etc/qubes-rpc/policy/{}'.format(service)
+    while True:
+        with open(path, 'a+') as policy:
+            # take the lock here, it's released by closing the file
+            fcntl.lockf(policy.fileno(), fcntl.LOCK_EX)
+            # While we were waiting for lock, someone could have unlink()ed
+            # (or rename()d) our file out of the filesystem. We have to
+            # ensure we got lock on something linked to filesystem.
+            # If not, try again.
+            if os.fstat(policy.fileno()) != os.stat(path):
+                continue
+
+            policy.seek(0)
+
+            policy_rules = policy.readlines()
+            if add:
+                policy_rules.insert(0, line)
+            else:
+                # handle also cases where previous cleanup failed or
+                # was done manually
+                while line in policy_rules:
+                    policy_rules.remove(line)
+
+            if policy_rules:
+                with tempfile.NamedTemporaryFile(
+                        prefix=path, delete=False) as policy_new:
+                    policy_new.write(''.join(policy_rules).encode())
+                    policy_new.flush()
+                    try:
+                        os.chown(policy_new.name, -1,
+                            grp.getgrnam('qubes').gr_gid)
+                        os.chmod(policy_new.name, 0o660)
+                    except KeyError:  # group 'qubes' not found
+                        # don't change mode if no 'qubes' group in the system
+                        pass
+                os.rename(policy_new.name, path)
+            else:
+                os.remove(path)
+        break
 
 
 class USBDeviceExtension(qubes.ext.Extension):
@@ -235,26 +290,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         # set qrexec policy to allow this device
         policy_line = '{} {} allow,user=root\n'.format(vm.name,
             device.backend_domain.name)
-        policy_path = '/etc/qubes-rpc/policy/qubes.USB+{}'.format(
-            device.ident)
-        policy_exists = os.path.exists(policy_path)
-        if not policy_exists:
-            try:
-                fd = os.open(policy_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                with os.fdopen(fd, 'w') as f:
-                    f.write(policy_line)
-            except OSError as e:
-                if e.errno == errno.EEXIST:
-                    pass
-                else:
-                    raise
-        else:
-            with open(policy_path, 'r+') as f:
-                policy = f.readlines()
-                policy.insert(0, policy_line)
-                f.truncate(0)
-                f.seek(0)
-                f.write(''.join(policy))
+        modify_qrexec_policy('qubes.USB+{}'.format(device.ident),
+            policy_line, True)
         try:
             # and actual attach
             try:
@@ -273,20 +310,8 @@ class USBDeviceExtension(qubes.ext.Extension):
                     raise QubesUSBException(
                         'Device attach failed: {}'.format(sanitized_stderr))
         finally:
-            # FIXME: there is a race condition here - some other process might
-            # modify the file in the meantime. This may result in unexpected
-            # denials, but will not allow too much
-            if not policy_exists:
-                os.unlink(policy_path)
-            else:
-                with open(policy_path, 'r+') as f:
-                    policy = f.readlines()
-                    policy.remove(
-                        '{} {} allow\n'.format(vm.name,
-                            device.backend_domain.name))
-                    f.truncate(0)
-                    f.seek(0)
-                    f.write(''.join(policy))
+            modify_qrexec_policy('qubes.USB+{}'.format(device.ident),
+                policy_line, False)
 
     @qubes.ext.handler('device-pre-detach:usb')
     @asyncio.coroutine
