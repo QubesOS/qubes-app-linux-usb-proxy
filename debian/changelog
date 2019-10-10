@@ -1,3 +1,10 @@
+qubes-usb-proxy (1.0.22) wheezy; urgency=medium
+
+  * Fix granting/revoking qubes.USB service access
+  * travis: switch to xenial, drop R3.2, update distros
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 10 Oct 2019 14:51:43 +0200
+
 qubes-usb-proxy (1.0.21) unstable; urgency=medium
 
   [ Malte Leip ]
