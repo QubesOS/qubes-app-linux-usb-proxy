@@ -118,12 +118,16 @@ cleanup() {
     qubesdb-rm \
         /qubes-usb-devices/${safe_busid}/connected-to \
         /qubes-usb-devices/${safe_busid}/x-pid
+    # notify dom0
+    qubesdb-write /qubes-usb-devices ''
     exit
 }
 trap "cleanup" EXIT TERM
 qubesdb-write \
     /qubes-usb-devices/${safe_busid}/connected-to "${QREXEC_REMOTE_DOMAIN}" \
     /qubes-usb-devices/${safe_busid}/x-pid "$$"
+# notify dom0
+qubesdb-write /qubes-usb-devices ''
 
 # FIXME this is racy as hell!
 while sleep 1; do
