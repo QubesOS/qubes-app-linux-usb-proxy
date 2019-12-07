@@ -180,7 +180,9 @@ class USBDeviceExtension(qubes.ext.Extension):
         '''Initialize watching for changes'''
         # pylint: disable=unused-argument,no-self-use
         vm.watch_qdb_path('/qubes-usb-devices')
-        self.devices_cache[vm.name] = set()
+        current_devices = dict((dev.ident, dev.frontend_domain)
+            for dev in self.on_device_list_usb(vm, None))
+        self.devices_cache[vm.name] = current_devices
 
     @asyncio.coroutine
     def _attach_and_notify(self, vm, device, options):
@@ -196,13 +198,38 @@ class USBDeviceExtension(qubes.ext.Extension):
         '''A change in QubesDB means a change in device list'''
         # pylint: disable=unused-argument,no-self-use
         vm.fire_event('device-list-change:usb')
-        current_devices = set(dev.ident
+        current_devices = dict((dev.ident, dev.frontend_domain)
             for dev in self.on_device_list_usb(vm, None))
+
+        # compare cached devices and current devices, collect:
+        # - newly appeared devices
+        # - devices disconnected from a vm
+        # - devices connected to a vm
         new_devices = set()
-        for dev in current_devices:
-            if dev not in self.devices_cache[vm.name]:
+        connected_devices = dict()
+        disconnected_devices = dict()
+        devices_cache = self.devices_cache[vm.name]
+        for dev, connected_to in current_devices.items():
+            if dev not in devices_cache:
                 new_devices.add(dev)
+            elif devices_cache[dev] != current_devices[dev]:
+                if devices_cache[dev] is not None:
+                    disconnected_devices[dev] = devices_cache[dev]
+                if current_devices[dev] is not None:
+                    connected_devices[dev] = current_devices[dev]
+
         self.devices_cache[vm.name] = current_devices
+        # send events about devices detached/attached outside by themselves
+        # (like device pulled out or manual qubes.USB qrexec call)
+        for dev_ident, front_vm in disconnected_devices.items():
+            dev = USBDevice(vm, dev_ident)
+            asyncio.ensure_future(front_vm.fire_event_async('device-detach:usb',
+                                                            device=dev))
+        for dev_ident, front_vm in connected_devices.items():
+            dev = USBDevice(vm, dev_ident)
+            asyncio.ensure_future(front_vm.fire_event_async('device-attach:usb',
+                                                            device=dev,
+                                                            options={}))
         for front_vm in vm.app.domains:
             if not front_vm.is_running():
                 continue
@@ -287,6 +314,10 @@ class USBDeviceExtension(qubes.ext.Extension):
                     device.frontend_domain)
             )
 
+        # update the cache before the call, to avoid sending duplicated events
+        # (one on qubesdb watch and the other by the caller of this method)
+        self.devices_cache[device.backend_domain.name][device.ident] = vm
+
         # set qrexec policy to allow this device
         policy_line = '{} {} allow,user=root\n'.format(vm.name,
             device.backend_domain.name)
@@ -329,6 +360,10 @@ class USBDeviceExtension(qubes.ext.Extension):
             raise QubesUSBException(
                 "Device {!s} not connected to VM {}".format(
                     device, vm.name))
+
+        # update the cache before the call, to avoid sending duplicated events
+        # (one on qubesdb watch and the other by the caller of this method)
+        self.devices_cache[device.backend_domain.name][device.ident] = None
 
         try:
             yield from device.backend_domain.run_service_for_stdio(
