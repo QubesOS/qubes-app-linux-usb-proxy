@@ -1,3 +1,15 @@
+qubes-usb-proxy (1.0.23) unstable; urgency=medium
+
+  [ Frédéric Pierret (fepitre) ]
+  * travis: switch to bionic
+
+  [ Marek Marczykowski-Górecki ]
+  * Send events even when device is attached/detached by alternative
+    method
+  * Ensure dom0 receives events on attach/detach
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Tue, 10 Dec 2019 17:27:03 +0100
+
 qubes-usb-proxy (1.0.22) wheezy; urgency=medium
 
   * Fix granting/revoking qubes.USB service access
