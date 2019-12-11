@@ -180,9 +180,14 @@ class USBDeviceExtension(qubes.ext.Extension):
         '''Initialize watching for changes'''
         # pylint: disable=unused-argument,no-self-use
         vm.watch_qdb_path('/qubes-usb-devices')
-        current_devices = dict((dev.ident, dev.frontend_domain)
-            for dev in self.on_device_list_usb(vm, None))
-        self.devices_cache[vm.name] = current_devices
+        if event == 'domain-load':
+            # avoid building a cache on domain-init, as it isn't fully set yet,
+            # and definitely isn't running yet
+            current_devices = dict((dev.ident, dev.frontend_domain)
+                for dev in self.on_device_list_usb(vm, None))
+            self.devices_cache[vm.name] = current_devices
+        else:
+            self.devices_cache[vm.name] = {}
 
     @asyncio.coroutine
     def _attach_and_notify(self, vm, device, options):
