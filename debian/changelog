@@ -1,3 +1,11 @@
+qubes-usb-proxy (1.0.25) unstable; urgency=medium
+
+  * Add attach timeout
+  * Don't include python2 tests on new dom0 (based on >f28)
+  * travis: switch R4.1 to fc31 dom0
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Mon, 06 Jan 2020 03:33:59 +0100
+
 qubes-usb-proxy (1.0.24) unstable; urgency=medium
 
   * Fix device cache initialization
