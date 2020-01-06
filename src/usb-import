@@ -19,7 +19,7 @@ usage() {
 
 ERROR() {
   (
-    echo "$@ "
+    echo "$* "
     echo "VM: \"`hostname`\" File: \"$0\" "
     echo "Version Control: "
     echo -n "https://github.com/QubesOS/qubes-app-linux-usb-proxy"
@@ -84,10 +84,15 @@ attach() {
 wait_for_attached() {
     local port="$1"
     local local_busid="0-0"
+    local timeout=25
     while [ ! -e /sys/bus/usb/devices/$local_busid ]; do
         sleep 0.2
         port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
         local_busid=${port_status##* }
+        timeout=$(( timeout - 1 ))
+        if [ "$timeout" -ge 0 ]; then
+            ERROR "Attach timeout, check kernel log for details."
+        fi
     done
     udevadm settle
 }
