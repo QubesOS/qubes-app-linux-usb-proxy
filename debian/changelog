@@ -1,3 +1,9 @@
+qubes-usb-proxy (1.0.26) unstable; urgency=medium
+
+  * Fix attach timeout handling
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 08 Jan 2020 00:07:23 +0100
+
 qubes-usb-proxy (1.0.25) unstable; urgency=medium
 
   * Add attach timeout
