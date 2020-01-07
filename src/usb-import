@@ -90,7 +90,8 @@ wait_for_attached() {
         port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
         local_busid=${port_status##* }
         timeout=$(( timeout - 1 ))
-        if [ "$timeout" -ge 0 ]; then
+        if [ "$timeout" -le 0 ]; then
+            echo "$port" > $DEVPATH/detach
             ERROR "Attach timeout, check kernel log for details."
         fi
     done
