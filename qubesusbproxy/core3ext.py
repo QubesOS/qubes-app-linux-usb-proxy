@@ -392,3 +392,8 @@ class USBDeviceExtension(qubes.ext.Extension):
     def on_domain_shutdown(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
         vm.fire_event('device-list-change:usb')
+
+    @qubes.ext.handler('qubes-close', system=True)
+    def on_qubes_close(self, app, event):
+        # pylint: disable=unused-argument
+        self.devices_cache.clear()
