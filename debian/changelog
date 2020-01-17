@@ -1,3 +1,9 @@
+qubes-usb-proxy (1.0.27) unstable; urgency=medium
+
+  * Clear cache when Qubes() object is getting destroyed
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 17 Jan 2020 04:22:13 +0100
+
 qubes-usb-proxy (1.0.26) unstable; urgency=medium
 
   * Fix attach timeout handling
