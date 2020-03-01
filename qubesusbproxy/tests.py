@@ -172,6 +172,8 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
             wait=True), 0,
             "Device connection failed")
         remove_usb_gadget(self.backend)
+        # FIXME: usb-export script may update qubesdb/disconnect with 1sec delay
+        time.sleep(2)
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234', wait=True), 1,
             "Device not cleaned up")
         # TODO: check for kernel errors?
@@ -401,7 +403,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         self.loop.run_until_complete(
             self.frontend.devices['usb'].detach(ass))
         # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(2)
+        self.loop.run_until_complete(asyncio.sleep(2))
 
         self.assertIsNone(usb_dev.frontend_domain)
 
@@ -457,7 +459,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
         remove_usb_gadget(self.backend)
         # FIXME: usb-export script may update qubesdb with 1sec delay
-        self.loop.run_until_complete(asyncio.sleep(1))
+        self.loop.run_until_complete(asyncio.sleep(2))
 
         self.assertNotIn(self.usbdev_name, [str(dev) for dev in usb_list])
         self.assertNotEqual(self.frontend.run('lsusb -d 1234:1234',
