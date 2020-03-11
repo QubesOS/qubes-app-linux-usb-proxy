@@ -98,6 +98,20 @@ wait_for_attached() {
     udevadm settle
 }
 
+wait_for_detached() {
+    local port="$1"
+    local local_busid
+    local port_status
+    port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
+    local_busid=${port_status##* }
+    if [ -z "$local_busid" ]; then
+        return
+    fi
+    while [ -e /sys/bus/usb/devices/$local_busid ]; do
+        sleep 1
+    done
+}
+
 
 # negotiate parameters (field 'extra' reserved for future use)
 read untrusted_devid untrusted_speed untrusted_extra
@@ -151,3 +165,9 @@ wait_for_attached "$port"
 if [ -n "$SERVICE_ATTACH_PID" ]; then
     kill -HUP $SERVICE_ATTACH_PID
 fi
+
+# close stdin/out so the kernel is the only one with the socket reference
+exec <&- >&- 2>&-
+
+# do not end the process until device is detached, to not close the qrexec connection
+wait_for_detached "$port"
