@@ -128,8 +128,9 @@ case "$untrusted_speed" in
     480) speed=3 ;; # High Speed
     53.3-480) speed=4 ;; # Wireless
     5000) speed=5 ;; # Super Speed
+    10000) speed=5 ;; # Super Speed Plus (USB 3.1); Announce as USB 3.0 until USBIP get support
     *) ERROR "Invalid speed \"$untrusted_speed\" received." \
-             "Expected \"1.5\", \"12\", \"480\", \"53.3-480\" or \"5000\". " \
+             "Expected \"1.5\", \"12\", \"480\", \"53.3-480\", \"5000\", \"10000\". " \
              "If the remote side sent nothing, this could mean "\
              "  - the device is invalid or unplugged" \
              "  - the VM crashed" \
