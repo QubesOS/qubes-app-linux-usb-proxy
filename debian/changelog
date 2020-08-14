@@ -1,3 +1,13 @@
+qubes-usb-proxy (1.0.29) wheezy; urgency=medium
+
+  [ Frédéric Pierret (fepitre) ]
+  * Update travis
+
+  [ Marek Marczykowski-Górecki ]
+  * Add Super Speed Plus (10000) to allowed speed values
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sat, 15 Aug 2020 01:37:39 +0200
+
 qubes-usb-proxy (1.0.28) unstable; urgency=medium
 
   * tests: adjust delay after removing/detaching device
