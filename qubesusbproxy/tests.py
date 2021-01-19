@@ -535,6 +535,24 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         self.loop.run_until_complete(
             self.frontend.devices['usb'].attach(ass))
 
+    def test_090_attach_stubdom(self):
+        self.frontend.virt_mode = 'hvm'
+        self.frontend.features['stubdom_qrexec'] = True
+        with open('/etc/qubes-rpc/policy/qubes.USB+{}'.format(self.usbdev_ident), 'w+') as policy_file:
+            policy_file.write('{}-dm {} allow \n'.format(self.frontend.name,self.backend.name))
+        self.frontend.start()
+        usb_dev = self.backend.devices['usb'][self.usbdev_ident]
+        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        try:
+            self.loop.run_until_complete(
+                self.frontend.devices['usb'].attach(ass))
+        except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
+            self.skipTest(str(e))
+
+        time.sleep(5)
+        self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
+            wait=True), 0,
+            "Device connection failed")
 
 def list_tests():
     tests = [TC_00_USBProxy]
