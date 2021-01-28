@@ -538,8 +538,6 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
     def test_090_attach_stubdom(self):
         self.frontend.virt_mode = 'hvm'
         self.frontend.features['stubdom-qrexec'] = True
-        with open('/etc/qubes-rpc/policy/qubes.USB+{}'.format(self.usbdev_ident), 'w+') as policy_file:
-            policy_file.write('{}-dm {} allow \n'.format(self.frontend.name,self.backend.name))
         self.frontend.start()
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
         ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
