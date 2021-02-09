@@ -320,7 +320,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             )
 
         stubdom_qrexec = (vm.virt_mode == 'hvm' and \
-            vm.features.check_with_template('stubdom_qrexec', False))
+            vm.features.check_with_template('stubdom-qrexec', False))
 
         name = vm.name + '-dm' if stubdom_qrexec else vm.name
 
