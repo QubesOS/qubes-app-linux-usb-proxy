@@ -1,6 +1,6 @@
 #!/bin/sh
 
-modprobe vhci-hcd || exit 1
+[ -f "/usr/sbin/modprobe" ] && (modprobe vhci-hcd || exit 1)
 
 DEVPATH="/sys/devices/platform/vhci_hcd"
 if [ -d "${DEVPATH}.0" ]; then
@@ -95,7 +95,7 @@ wait_for_attached() {
             ERROR "Attach timeout, check kernel log for details."
         fi
     done
-    udevadm settle
+    [ -f "/usr/bin/udevadm" ] && udevadm settle
 }
 
 wait_for_detached() {
