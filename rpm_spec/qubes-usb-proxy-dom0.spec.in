@@ -16,6 +16,7 @@ License:	GPLv2
 URL:		https://www.qubes-os.org/
 BuildArch:  noarch
 
+BuildRequires:	make
 BuildRequires:	python3-devel
 %if %{with python2}
 BuildRequires:	python2-devel
