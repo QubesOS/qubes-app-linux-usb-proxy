@@ -7,6 +7,8 @@ Group:		System
 License:	GPLv2
 URL:		https://www.qubes-os.org/
 BuildArch:  noarch
+
+BuildRequires: make
 Requires:   usbutils
 
 Source0: %{name}-%{version}.tar.gz
