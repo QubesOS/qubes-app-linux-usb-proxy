@@ -1,3 +1,11 @@
+qubes-usb-proxy (1.0.30) unstable; urgency=medium
+
+  [ Frédéric Pierret (fepitre) ]
+  * Add .gitlab-ci.yml
+  * spec: add BR make
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sun, 23 May 2021 17:28:58 +0200
+
 qubes-usb-proxy (1.0.29) wheezy; urgency=medium
 
   [ Frédéric Pierret (fepitre) ]
