@@ -319,12 +319,21 @@ class USBDeviceExtension(qubes.ext.Extension):
                     device.frontend_domain)
             )
 
+        stubdom_qrexec = (vm.virt_mode == 'hvm' and \
+            vm.features.check_with_template('stubdom-qrexec', False))
+
+        name = vm.name + '-dm' if stubdom_qrexec else vm.name
+
+        extra_kwargs = {}
+        if stubdom_qrexec:
+            extra_kwargs['stubdom'] = True
+
         # update the cache before the call, to avoid sending duplicated events
         # (one on qubesdb watch and the other by the caller of this method)
         self.devices_cache[device.backend_domain.name][device.ident] = vm
 
         # set qrexec policy to allow this device
-        policy_line = '{} {} allow,user=root\n'.format(vm.name,
+        policy_line = '{} {} allow,user=root\n'.format(name,
             device.backend_domain.name)
         modify_qrexec_policy('qubes.USB+{}'.format(device.ident),
             policy_line, True)
@@ -334,7 +343,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 yield from vm.run_service_for_stdio('qubes.USBAttach',
                     user='root',
                     input='{} {}\n'.format(device.backend_domain.name,
-                        device.ident).encode())
+                        device.ident).encode(), **extra_kwargs)
             except subprocess.CalledProcessError as e:
                 if e.returncode == 127:
                     raise USBProxyNotInstalled(

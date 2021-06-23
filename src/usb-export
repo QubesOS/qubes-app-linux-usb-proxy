@@ -124,7 +124,7 @@ cleanup() {
 }
 trap "cleanup" EXIT TERM
 qubesdb-write \
-    /qubes-usb-devices/${safe_busid}/connected-to "${QREXEC_REMOTE_DOMAIN}" \
+    /qubes-usb-devices/${safe_busid}/connected-to "${QREXEC_REMOTE_DOMAIN%-dm}" \
     /qubes-usb-devices/${safe_busid}/x-pid "$$"
 # notify dom0
 qubesdb-write /qubes-usb-devices ''
