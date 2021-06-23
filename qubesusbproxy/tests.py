@@ -41,6 +41,14 @@ try:
 except ImportError:
     pass
 
+is_r40 = False
+try:
+    with open('/etc/qubes-release') as f:
+        if 'R4.0' in f.read():
+            is_r40 = True
+except FileNotFoundError:
+    pass
+
 
 GADGET_PREREQ = '&&'.join([
     "modprobe dummy_hcd",
@@ -535,6 +543,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         self.loop.run_until_complete(
             self.frontend.devices['usb'].attach(ass))
 
+    @unittest.skipIf(is_r40, "Not supported on R4.0")
     def test_090_attach_stubdom(self):
         self.frontend.virt_mode = 'hvm'
         self.frontend.features['stubdom-qrexec'] = True

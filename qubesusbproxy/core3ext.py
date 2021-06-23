@@ -324,6 +324,10 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         name = vm.name + '-dm' if stubdom_qrexec else vm.name
 
+        extra_kwargs = {}
+        if stubdom_qrexec:
+            extra_kwargs['stubdom'] = True
+
         # update the cache before the call, to avoid sending duplicated events
         # (one on qubesdb watch and the other by the caller of this method)
         self.devices_cache[device.backend_domain.name][device.ident] = vm
@@ -337,9 +341,9 @@ class USBDeviceExtension(qubes.ext.Extension):
             # and actual attach
             try:
                 yield from vm.run_service_for_stdio('qubes.USBAttach',
-                    user='root', stubdom=stubdom_qrexec,
+                    user='root',
                     input='{} {}\n'.format(device.backend_domain.name,
-                        device.ident).encode())
+                        device.ident).encode(), **extra_kwargs)
             except subprocess.CalledProcessError as e:
                 if e.returncode == 127:
                     raise USBProxyNotInstalled(
