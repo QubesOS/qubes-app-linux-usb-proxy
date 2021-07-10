@@ -1,3 +1,20 @@
+qubes-usb-proxy (1.1.0) unstable; urgency=medium
+
+  [ Dmitry Fedorov ]
+  * winusb: attach usb device to stubdom if feature enabled
+  * winusb: test usb device in stubdom
+  * winusb: Write guest domain to the qubesdb when device connected to
+    stubdom
+  * winusb: make modprobe and udevadm usage optional
+  * winusb: fix feature naming
+  * winusb: remove redundant rules
+  * winusb: fix feature naming
+
+  [ Marek Marczykowski-Górecki ]
+  * Make it work on R4.0 too
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sat, 10 Jul 2021 05:20:24 +0200
+
 qubes-usb-proxy (1.0.30) unstable; urgency=medium
 
   [ Frédéric Pierret (fepitre) ]
