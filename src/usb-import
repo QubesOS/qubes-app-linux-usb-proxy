@@ -1,6 +1,6 @@
 #!/bin/sh
 
-[ -f "/usr/sbin/modprobe" ] && (modprobe vhci-hcd || exit 1)
+command -v modprobe >/dev/null && (modprobe vhci-hcd || exit 1)
 
 DEVPATH="/sys/devices/platform/vhci_hcd"
 if [ -d "${DEVPATH}.0" ]; then
