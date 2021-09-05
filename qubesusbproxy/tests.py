@@ -499,7 +499,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
             self.loop.run_until_complete(asyncio.sleep(1))
             timeout -= 1
             self.assertGreater(timeout, 0, 'timeout on device create')
-        self.loop.run_until_complete(asyncio.sleep(1))
+        self.loop.run_until_complete(asyncio.sleep(5))
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
             wait=True), 0,
             "Device reconnection failed")
