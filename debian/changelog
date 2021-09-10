@@ -1,3 +1,10 @@
+qubes-usb-proxy (1.1.1) unstable; urgency=medium
+
+  * Fix checking if modprobe is available
+  * tests: increase timeout for device reconnect
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 10 Sep 2021 13:11:39 +0200
+
 qubes-usb-proxy (1.1.0) unstable; urgency=medium
 
   [ Dmitry Fedorov ]
