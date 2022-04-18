@@ -1,0 +1,14 @@
+host:
+  rpm:
+    spec:
+    - rpm_spec/qubes-usb-proxy-dom0.spec
+vm:
+  rpm:
+    spec:
+    - rpm_spec/qubes-usb-proxy.spec
+  deb:
+    build:
+    - debian
+  archlinux:
+    build:
+    - archlinux
