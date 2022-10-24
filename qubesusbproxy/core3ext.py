@@ -189,12 +189,11 @@ class USBDeviceExtension(qubes.ext.Extension):
         else:
             self.devices_cache[vm.name] = {}
 
-    @asyncio.coroutine
-    def _attach_and_notify(self, vm, device, options):
+    async def _attach_and_notify(self, vm, device, options):
         # bypass DeviceCollection logic preventing double attach
-        yield from self.on_device_attach_usb(vm,
+        await self.on_device_attach_usb(vm,
             'device-pre-attach:usb', device, options)
-        yield from vm.fire_event_async('device-attach:usb',
+        await vm.fire_event_async('device-attach:usb',
                 device=device,
                 options=options)
 
@@ -300,8 +299,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 yield (dev, {})
 
     @qubes.ext.handler('device-pre-attach:usb')
-    @asyncio.coroutine
-    def on_device_attach_usb(self, vm, event, device, options):
+    async def on_device_attach_usb(self, vm, event, device, options):
         # pylint: disable=unused-argument
         if not vm.is_running() or vm.qid == 0:
             return
@@ -340,7 +338,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         try:
             # and actual attach
             try:
-                yield from vm.run_service_for_stdio('qubes.USBAttach',
+                await vm.run_service_for_stdio('qubes.USBAttach',
                     user='root',
                     input='{} {}\n'.format(device.backend_domain.name,
                         device.ident).encode(), **extra_kwargs)
@@ -359,8 +357,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 policy_line, False)
 
     @qubes.ext.handler('device-pre-detach:usb')
-    @asyncio.coroutine
-    def on_device_detach_usb(self, vm, event, device):
+    async def on_device_detach_usb(self, vm, event, device):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running() or vm.qid == 0:
             return
@@ -380,7 +377,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         self.devices_cache[device.backend_domain.name][device.ident] = None
 
         try:
-            yield from device.backend_domain.run_service_for_stdio(
+            await device.backend_domain.run_service_for_stdio(
                 'qubes.USBDetach',
                 user='root',
                 input='{}\n'.format(device.ident).encode())
@@ -389,16 +386,14 @@ class USBDeviceExtension(qubes.ext.Extension):
             raise QubesUSBException('Device detach failed')
 
     @qubes.ext.handler('domain-start')
-    @asyncio.coroutine
-    def on_domain_start(self, vm, _event, **_kwargs):
+    async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
         for assignment in vm.devices['usb'].assignments(persistent=True):
             device = assignment.device
-            yield from self.on_device_attach_usb(vm, '', device, options={})
+            await self.on_device_attach_usb(vm, '', device, options={})
 
     @qubes.ext.handler('domain-shutdown')
-    @asyncio.coroutine
-    def on_domain_shutdown(self, vm, _event, **_kwargs):
+    async def on_domain_shutdown(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
         vm.fire_event('device-list-change:usb')
 
