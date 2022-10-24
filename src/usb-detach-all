@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Detach all devices before suspend
+
+for dev in /sys/bus/usb/devices/*/usbip_sockfd; do
+    if [ -w "$dev" ]; then
+        echo -1 > "$dev"
+    fi
+done

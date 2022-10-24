@@ -5,6 +5,9 @@ install-vm:
 	install qubes-rpc/qubes.USB $(DESTDIR)/etc/qubes-rpc
 	install -d $(DESTDIR)/usr/lib/qubes
 	install src/usb-* $(DESTDIR)/usr/lib/qubes
+	install -d $(DESTDIR)/etc/qubes/suspend-pre.d
+	ln -s ../../../usr/lib/qubes/usb-detach-all \
+		$(DESTDIR)/etc/qubes/suspend-pre.d/usb-detach-all.sh
 
 PYTHON2_SITELIB ?= $(shell python2 -c "from distutils.sysconfig import get_python_lib; print get_python_lib(0)")
 
