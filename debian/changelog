@@ -1,3 +1,16 @@
+qubes-usb-proxy (1.1.2) unstable; urgency=medium
+
+  [ Frédéric Pierret (fepitre) ]
+  * Drop Travis CI
+  * Add Qubes Builder v2 integration
+  * .qubesbuilder: replace 'spec' by 'build'
+
+  [ Marek Marczykowski-Górecki ]
+  * Use async/await
+  * Detach all devices before suspending
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 27 Oct 2022 02:50:39 +0200
+
 qubes-usb-proxy (1.1.1) unstable; urgency=medium
 
   * Fix checking if modprobe is available
