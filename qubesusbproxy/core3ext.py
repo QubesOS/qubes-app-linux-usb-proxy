@@ -173,7 +173,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         # installed there
         self.usb_proxy_installed_in_dom0 = os.path.exists(
             '/etc/qubes-rpc/qubes.USB')
-        self.devices_cache = {}
+        self.devices_cache = collections.defaultdict(dict)
 
     @qubes.ext.handler('domain-init', 'domain-load')
     def on_domain_init_load(self, vm, event):
@@ -212,13 +212,13 @@ class USBDeviceExtension(qubes.ext.Extension):
         new_devices = set()
         connected_devices = dict()
         disconnected_devices = dict()
-        devices_cache = self.devices_cache[vm.name]
+        devices_cache_for_vm = self.devices_cache[vm.name]
         for dev, connected_to in current_devices.items():
-            if dev not in devices_cache:
+            if dev not in devices_cache_for_vm:
                 new_devices.add(dev)
-            elif devices_cache[dev] != current_devices[dev]:
-                if devices_cache[dev] is not None:
-                    disconnected_devices[dev] = devices_cache[dev]
+            elif devices_cache_for_vm[dev] != current_devices[dev]:
+                if devices_cache_for_vm[dev] is not None:
+                    disconnected_devices[dev] = devices_cache_for_vm[dev]
                 if current_devices[dev] is not None:
                     connected_devices[dev] = current_devices[dev]
 
