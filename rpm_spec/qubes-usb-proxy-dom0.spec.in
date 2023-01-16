@@ -8,8 +8,9 @@ License:	GPLv2
 URL:		https://www.qubes-os.org/
 BuildArch:  noarch
 
-BuildRequires:	make
-BuildRequires:	python3-devel
+BuildRequires: make
+BuildRequires: python3-devel
+BuildRequires: python3-setuptools
 
 Source0: qubes-usb-proxy-%{version}.tar.gz
 
