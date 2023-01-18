@@ -1,11 +1,3 @@
-# python2 is not available on RHEL > 7 and not needed on Fedora > 28
-%if 0%{?rhel} > 7 || 0%{?fedora} > 28
-# disable python2 by default
-%bcond_with python2
-%else
-%bcond_without python2
-%endif
-
 Name:		qubes-usb-proxy-dom0
 Version:	@VERSION@
 Release:	1%{?dist}
@@ -16,13 +8,9 @@ License:	GPLv2
 URL:		https://www.qubes-os.org/
 BuildArch:  noarch
 
-BuildRequires:	make
-BuildRequires:	python3-devel
-%if %{with python2}
-BuildRequires:	python2-devel
-%endif
-# do not require specific python verison, should be pulled in by relevant core
-# package
+BuildRequires: make
+BuildRequires: python3-devel
+BuildRequires: python3-setuptools
 
 Source0: qubes-usb-proxy-%{version}.tar.gz
 
@@ -34,7 +22,6 @@ This package also contains tests.
 %setup -q -n qubes-usb-proxy-%{version}
 
 %install
-%{?with_python2:make install-dom0-py2 DESTDIR=${RPM_BUILD_ROOT}}
 make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
 
 %files
@@ -42,11 +29,6 @@ make install-dom0 DESTDIR=${RPM_BUILD_ROOT}
 %dir %{python3_sitelib}/qubesusbproxy-*.egg-info
 %{python3_sitelib}/qubesusbproxy-*.egg-info/*
 %{python3_sitelib}/qubesusbproxy
-%if %{with python2}
-%dir %{python2_sitelib}/qubesusbproxy-*.egg-info
-%{python2_sitelib}/qubesusbproxy-*.egg-info/*
-%{python2_sitelib}/qubesusbproxy
-%endif
 
 %changelog
 @CHANGELOG@
