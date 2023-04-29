@@ -1,3 +1,11 @@
+qubes-usb-proxy (1.1.5) unstable; urgency=medium
+
+  [ Frédéric Pierret (fepitre) ]
+  * Rework Archlinux packaging
+  * Bare support for new packaging with PKGBUILD.in
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sat, 29 Apr 2023 03:28:05 +0200
+
 qubes-usb-proxy (1.1.4) unstable; urgency=medium
 
   * Add missing import collections
