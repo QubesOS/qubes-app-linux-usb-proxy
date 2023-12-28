@@ -30,6 +30,7 @@ import os
 import re
 import string
 import subprocess
+import sys
 
 import tempfile
 from enum import Enum
@@ -48,7 +49,6 @@ usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
 class USBDevice(qubes.devices.DeviceInfo):
     # pylint: disable=too-few-public-methods
     def __init__(self, backend_domain, ident):
-        # super(USBDevice, self).__init__(backend_domain, ident, None)
         super(USBDevice, self).__init__(
             backend_domain=backend_domain, ident=ident, devclass="usb")
 
@@ -137,8 +137,7 @@ class USBDevice(qubes.devices.DeviceInfo):
 
         Every device should have at least one interface.
         """
-        if (len(self._interfaces) == 1
-                and self._interfaces[0] == qubes.devices.DeviceInterface.Other):
+        if self._interfaces is None:
             result = self._load_interfaces_from_qubesdb()
         else:
             result = self._interfaces
@@ -162,7 +161,7 @@ class USBDevice(qubes.devices.DeviceInfo):
 
     def _load_interfaces_from_qubesdb(self) \
             -> List[qubes.devices.DeviceInterface]:
-        result = []
+        result = [qubes.devices.DeviceInterface.Other]
         if not self.backend_domain.is_running():
             # don't cache this value
             return result
@@ -319,6 +318,7 @@ class USBDevice(qubes.devices.DeviceInfo):
 
         return result
 
+
 class USBProxyNotInstalled(qubes.exc.QubesException):
     pass
 
@@ -397,9 +397,12 @@ class USBDeviceExtension(qubes.ext.Extension):
         if event == 'domain-load':
             # avoid building a cache on domain-init, as it isn't fully set yet,
             # and definitely isn't running yet
-            current_devices = dict((dev.ident, dev.frontend_domain)
-                for dev in self.on_device_list_usb(vm, None))
+            current_devices = {
+                dev.ident: dev.frontend_domain
+                for dev in self.on_device_list_usb(vm, None)
+            }
             self.devices_cache[vm.name] = current_devices
+            # TODO: fire device-added
         else:
             self.devices_cache[vm.name] = {}
 
@@ -427,26 +430,32 @@ class USBDeviceExtension(qubes.ext.Extension):
         connected_devices = dict()
         disconnected_devices = dict()
         devices_cache_for_vm = self.devices_cache[vm.name]
-        for dev, connected_to in current_devices.items():
-            if dev not in devices_cache_for_vm:
-                new_devices.add(dev)
-            elif devices_cache_for_vm[dev] != current_devices[dev]:
-                if devices_cache_for_vm[dev] is not None:
-                    disconnected_devices[dev] = devices_cache_for_vm[dev]
-                if current_devices[dev] is not None:
-                    connected_devices[dev] = current_devices[dev]
+        for dev_id, connected_to in current_devices.items():
+            if dev_id not in devices_cache_for_vm:
+                new_devices.add(dev_id)
+                device = USBDevice(vm, dev_id)
+                vm.fire_event('device-added:usb', device=device)
+            elif devices_cache_for_vm[dev_id] != current_devices[dev_id]:
+                if devices_cache_for_vm[dev_id] is not None:
+                    disconnected_devices[dev_id] = devices_cache_for_vm[dev_id]
+                if current_devices[dev_id] is not None:
+                    connected_devices[dev_id] = current_devices[dev_id]
+        for dev_id, connected_to in devices_cache_for_vm.items():
+            if dev_id not in current_devices:
+                device = USBDevice(vm, dev_id)
+                vm.fire_event('device-removed:usb', device=device)
 
         self.devices_cache[vm.name] = current_devices
         # send events about devices detached/attached outside by themselves
         # (like device pulled out or manual qubes.USB qrexec call)
         for dev_ident, front_vm in disconnected_devices.items():
-            dev = USBDevice(vm, dev_ident)
+            dev_id = USBDevice(vm, dev_ident)
             asyncio.ensure_future(front_vm.fire_event_async('device-detach:usb',
-                                                            device=dev))
+                                                            device=dev_id))
         for dev_ident, front_vm in connected_devices.items():
-            dev = USBDevice(vm, dev_ident)
+            dev_id = USBDevice(vm, dev_ident)
             asyncio.ensure_future(front_vm.fire_event_async('device-attach:usb',
-                                                            device=dev,
+                                                            device=dev_id,
                                                             options={}))
         for front_vm in vm.app.domains:
             if not front_vm.is_running():
