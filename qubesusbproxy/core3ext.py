@@ -161,7 +161,7 @@ class USBDevice(qubes.devices.DeviceInfo):
 
     def _load_interfaces_from_qubesdb(self) \
             -> List[qubes.devices.DeviceInterface]:
-        result = [qubes.devices.DeviceInterface.Other]
+        result = [qubes.devices.DeviceInterface.unknown()]
         if not self.backend_domain.is_running():
             # don't cache this value
             return result
@@ -172,8 +172,8 @@ class USBDevice(qubes.devices.DeviceInfo):
         if not untrusted_interfaces:
             return result
         self._interfaces = result = [
-            qubes.devices.DeviceInterface.from_str(
-                self._sanitize(ifc, safe_chars=string.hexdigits)
+            qubes.devices.DeviceInterface(
+                self._sanitize(ifc, safe_chars=string.hexdigits), devclass="usb"
             )
             for ifc in untrusted_interfaces.split(b':')
             if ifc
@@ -214,11 +214,11 @@ class USBDevice(qubes.devices.DeviceInfo):
             self._sanitize(untrusted_vendor),
             self._sanitize(untrusted_product),
         )
-        self._desc_vendor = result["vendor"] = vendor
-        self._desc_product = result["product"] = product
-        self._desc_manufacturer = result["manufacturer"] = (
+        self._vendor = result["vendor"] = vendor
+        self._product = result["product"] = product
+        self._manufacturer = result["manufacturer"] = (
             self._sanitize(untrusted_manufacturer))
-        self._desc_name = result["name"] = (
+        self._name = result["name"] = (
             self._sanitize(untrusted_name))
         return result
 
@@ -292,7 +292,7 @@ class USBDevice(qubes.devices.DeviceInfo):
         #               prog-if  prog-if_name   <-- two tabs
         result = {}
         with open('/usr/share/hwdata/usb.ids',
-                  encoding='utf-8', errors='ignore') as usb_ids:
+                  encoding='utf-8', errors='ignore') as usb_ids:  # TODO debian etc.
             for line in usb_ids.readlines():
                 line = line.rstrip()
                 if line.startswith('#'):
@@ -402,7 +402,6 @@ class USBDeviceExtension(qubes.ext.Extension):
                 for dev in self.on_device_list_usb(vm, None)
             }
             self.devices_cache[vm.name] = current_devices
-            # TODO: fire device-added
         else:
             self.devices_cache[vm.name] = {}
 
@@ -416,7 +415,7 @@ class USBDeviceExtension(qubes.ext.Extension):
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
-        """A change in QubesDB means a change in device list"""
+        """A change in QubesDB means a change in device list."""
         # pylint: disable=unused-argument,no-self-use
         vm.fire_event('device-list-change:usb')
         current_devices = dict((dev.ident, dev.frontend_domain)
