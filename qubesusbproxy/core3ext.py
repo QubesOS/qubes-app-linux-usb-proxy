@@ -459,8 +459,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         for front_vm in vm.app.domains:
             if not front_vm.is_running():
                 continue
-            for assignment in front_vm.devices['usb'].assignments(
-                    persistent=True):
+            for assignment in front_vm.devices['usb'].get_assigned_devices():
                 if assignment.backend_domain == vm and \
                         assignment.ident in new_devices:
                     asyncio.ensure_future(self._attach_and_notify(
@@ -610,7 +609,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
-        for assignment in vm.devices['usb'].assignments(persistent=True):
+        for assignment in vm.devices['usb'].get_assigned_devices():
             device = assignment.device
             await self.on_device_attach_usb(vm, '', device, options={})
 
