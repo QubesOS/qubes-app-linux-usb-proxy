@@ -44,6 +44,7 @@ usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 usb_connected_to_re = re.compile(br"^[a-zA-Z][a-zA-Z0-9_.-]*$")
 usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
 
+HWDATA_PATH = '/usr/share/hwdata'
 
 class USBDevice(qubes.devices.DeviceInfo):
     # pylint: disable=too-few-public-methods
@@ -228,7 +229,7 @@ class USBDevice(qubes.devices.DeviceInfo):
         )
 
     @property
-    def frontend_domain(self):
+    def attachment(self):
         if not self.backend_domain.is_running():
             return None
         untrusted_connected_to = self.backend_domain.untrusted_qdb.read(
@@ -283,8 +284,8 @@ class USBDevice(qubes.devices.DeviceInfo):
         #       subclass  subclass_name         <-- single tab
         #               prog-if  prog-if_name   <-- two tabs
         result = {}
-        with open('/usr/share/hwdata/usb.ids',
-                  encoding='utf-8', errors='ignore') as usb_ids:  # TODO debian etc.
+        with open(HWDATA_PATH + '/usb.ids',
+                  encoding='utf-8', errors='ignore') as usb_ids:
             for line in usb_ids.readlines():
                 line = line.rstrip()
                 if line.startswith('#'):
@@ -394,7 +395,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             # avoid building a cache on domain-init, as it isn't fully set yet,
             # and definitely isn't running yet
             current_devices = {
-                dev.ident: dev.frontend_domain
+                dev.ident: dev.attachment
                 for dev in self.on_device_list_usb(vm, None)
             }
             self.devices_cache[vm.name] = current_devices
@@ -416,7 +417,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         """A change in QubesDB means a change in device list."""
         # pylint: disable=unused-argument,no-self-use
         vm.fire_event('device-list-change:usb')
-        current_devices = dict((dev.ident, dev.frontend_domain)
+        current_devices = dict((dev.ident, dev.attachment)
             for dev in self.on_device_list_usb(vm, None))
 
         # send events about devices detached/attached outside by themselves
@@ -535,7 +536,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             return
 
         for dev in self.get_all_devices(vm.app):
-            if dev.frontend_domain == vm:
+            if dev.attachment == vm:
                 yield (dev, {'identity': dev.full_identity})
 
     @qubes.ext.handler('device-pre-attach:usb')
@@ -567,10 +568,10 @@ class USBDeviceExtension(qubes.ext.Extension):
             #       file=sys.stderr)
             return
 
-        if device.frontend_domain:
+        if device.attachment:
             raise qubes.devices.DeviceAlreadyAttached(
                 'Device {!s} already attached to {!s}'.format(
-                    device, device.frontend_domain)
+                    device, device.attachment)
             )
 
         stubdom_qrexec = (
@@ -622,7 +623,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         if not isinstance(device, USBDevice):
             return
 
-        connected_to = device.frontend_domain
+        connected_to = device.attachment
         # detect race conditions; there is still race here, but much smaller
         if connected_to is None or connected_to.qid != vm.qid:
             raise QubesUSBException(
