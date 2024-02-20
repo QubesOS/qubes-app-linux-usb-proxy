@@ -571,7 +571,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 raise qubes.exc.QubesException(
                     'USB device attach do not support user options')
             identity = options['identity']
-            if device.self_identity != identity:
+            if identity != 'any' and device.self_identity != identity:
                 print(f"Unrecognized identity, skipping attachment of {device}",
                       file=sys.stderr)
                 raise qubes.devices.UnrecognizedDevice(
