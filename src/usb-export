@@ -86,6 +86,10 @@ if [ -z "$devpath" ]; then
 fi
 
 busid=${devpath##*/}
+if ! [[ "$busid" =~ ^[0-9]+-[0-9]+$ ]]; then
+    printf 'Invalid bus path %q\n' "$devpath" >&2
+    exit 1
+fi
 pidfile="/var/run/qubes/usb-export-$busid.pid"
 
 modprobe usbip-host
@@ -107,6 +111,11 @@ read status < "$devpath/usbip_status"
 if [ "$status" -ne "$SDEV_ST_AVAILABLE" ]; then
     printf 'Device %s not available!\n' "$devpath" >&2
     exit 1
+fi
+
+# Allow the device.
+if command -v usbguard > /dev/null; then
+    usbguard allow-device "via-port \"$busid\"" || :
 fi
 
 read -r busnum < "$devpath/busnum"
