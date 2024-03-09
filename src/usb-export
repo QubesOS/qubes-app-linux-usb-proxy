@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash --
+set -euo pipefail
 
 SYS_USB_DEVICES=/sys/bus/usb/devices
 SYS_USBIP_HOST=/sys/bus/usb/drivers/usbip-host
@@ -8,7 +9,7 @@ SDEV_ST_AVAILABLE=1
 SDEV_ST_USED=2
 SDEV_ST_ERROR=3
 
-usage() {
+usage () {
     echo "$0 device"
 }
 
@@ -17,17 +18,18 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
-find_by_bus_dev() {
-    local busnum=$1
-    local devnum=$2
-    for devpath in $SYS_USB_DEVICES/*; do
-        if ! [ -e $devpath/busnum -a -e $devpath/devnum ]; then
+find_by_bus_dev () {
+    local busnum="$1"
+    local devnum="$2"
+    local tmp_busnum tmp_devnum
+    for devpath in "$SYS_USB_DEVICES"/*; do
+        if [ ! -e "$devpath/busnum" ] && [ ! -e $devpath/devnum ]; then
             # skip individual interfaces etc
             continue
         fi
-        if [ "$busnum" -eq "$(cat $devpath/busnum)" -a \
-                "$devnum" -eq "$(cat $devpath/devnum)" ]; then
-            echo $devpath
+        read -r tmp_busnum < "$devpath/busnum"
+        read -r tmp_devnum < "$devpath/devnum"
+        if [ "$busnum" -eq "$tmp_busnum" ] && [ "$devnum" -eq "$tmp_devnum" ]; then
             return
         fi
     done
@@ -36,34 +38,40 @@ find_by_bus_dev() {
 }
 
 # Resolve device name to sysfs path
-resolve_device() {
+resolve_device () {
     device="$1"
+    local lsusb_output_array IFS=$'\n' lsusb_output
     # handle different device formats
     case $device in
         0x*.0x*)
-            device=$(echo "$device" | tr . :)
+            device=${device//./:}
             # make sure there is only one matching device
-            if [ $(lsusb -d $device | wc -l) -ne 1 ]; then
+            # Example: Bus 003 Device 002: ID 05e3:0608 Genesys Logic, Inc. Hub
+            set -f # suppress globbing
+            lsusb_output=$(lsusb -d "$device")
+            lsusb_output_array=($lsusb_output)
+            set +f
+            if [ "${#lsusb_output_array[@]}" -ne 1 ]; then
                 echo "Multiple or no devices matching $device, aborting!" >&2
                 exit 1
             fi
-            # Example: Bus 003 Device 002: ID 05e3:0608 Genesys Logic, Inc. Hub
-            lsusb_output="$(lsusb -d $device)"
             bus=$(echo "$lsusb_output" | cut -d ' ' -f 2)
             dev=$(echo "$lsusb_output" | cut -d ' ' -f 4 | tr -d :)
             find_by_bus_dev "$bus" "$dev"
             ;;
         *-*)
             # a single device, but NOT a specific interface
-            if echo "$device" | grep -q :; then
+            case $device in
+            *:*)
                 echo "You cannot export a specific device interface!" >&2
                 exit 1
-            fi
+                ;;
+            esac
             if ! [ -d "$SYS_USB_DEVICES/$device" ]; then
                 echo "No such device: $device" >&2
                 exit 1
             fi
-            echo "$SYS_USB_DEVICES/$device"
+            devpath="$SYS_USB_DEVICES/$device"
             ;;
         *)
             echo "Invalid device format: $device" >&2
@@ -72,68 +80,67 @@ resolve_device() {
     esac
 }
 
-devpath=$(resolve_device "$1")
+resolve_device "$1"
 if [ -z "$devpath" ]; then
     exit 1
 fi
 
-pidfile="/var/run/qubes/usb-export-$(basename $devpath).pid"
+busid=${devpath##*/}
+pidfile="/var/run/qubes/usb-export-$busid.pid"
 
-modprobe usbip-host || exit 1
+modprobe usbip-host
 
 # Request that both IN and OUT be handled on a single (stdin) socket
 kill -USR1 "$QREXEC_AGENT_PID" || exit 1
 
-busid=$(basename "$devpath")
 # Unbind the device from the driver
 if [ -d "$devpath/driver" ]; then
-    echo $busid > $devpath/driver/unbind || exit 1
+    printf %s "$busid" > "$devpath/driver/unbind" || exit 1
 fi
 
 # Bind to the usbip-host driver
-echo -n add $busid > $SYS_USBIP_HOST/match_busid || exit 1
-echo $busid > $SYS_USBIP_HOST/bind || exit 1
+printf 'add %s' "$busid" > "$SYS_USBIP_HOST/match_busid" || exit 1
+echo "$busid" > "$SYS_USBIP_HOST/bind" || exit 1
 
 # One more safety check - make sure the device is available
-if [ "$(cat $devpath/usbip_status)" -ne $SDEV_ST_AVAILABLE ]; then
-    echo "Device $devpath not available!" >&2
+read status < "$devpath/usbip_status"
+if [ "$status" -ne "$SDEV_ST_AVAILABLE" ]; then
+    printf 'Device %s not available!\n' "$devpath" >&2
     exit 1
 fi
 
-busnum=$(cat $devpath/busnum)
-devnum=$(cat $devpath/devnum)
-devid=$(( $busnum << 16 | $devnum ))
-speed=$(cat $devpath/speed)
+read -r busnum < "$devpath/busnum"
+read -r devnum < "$devpath/devnum"
+devid=$(( busnum << 16 | devnum ))
+read -r speed < "$devpath/speed"
 
 # Send device details to the other end (usb-import script)
-echo "$devid" "$speed" >&0
+printf '%s %s\n' "$devid" "$speed" >&0
 
-echo 0 > $devpath/usbip_sockfd || exit 1
-exec <&-
+echo 0 > "$devpath/usbip_sockfd" || exit 1
+exec < /dev/null
 
-echo $$ > "$pidfile"
-safe_busid=$(echo ${busid} | tr :. _)
+echo "$$" > "$pidfile"
+safe_busid=${busid//:/_}
+safe_busid=${safe_busid//./_}
 
 cleanup() {
     qubesdb-rm \
         /qubes-usb-devices/${safe_busid}/connected-to \
-        /qubes-usb-devices/${safe_busid}/x-pid
-    # notify dom0
-    qubesdb-write /qubes-usb-devices ''
+        /qubes-usb-devices/${safe_busid}/x-pid \
+        qubesdb-write /qubes-usb-devices ''
     exit
 }
 trap "cleanup" EXIT TERM
 qubesdb-write \
-    /qubes-usb-devices/${safe_busid}/connected-to "${QREXEC_REMOTE_DOMAIN%-dm}" \
-    /qubes-usb-devices/${safe_busid}/x-pid "$$"
-# notify dom0
-qubesdb-write /qubes-usb-devices ''
+    "/qubes-usb-devices/${safe_busid}/connected-to" "${QREXEC_REMOTE_DOMAIN%-dm}" \
+    "/qubes-usb-devices/${safe_busid}/x-pid" "$$" \
+    /qubes-usb-devices ''
 
 # FIXME this is racy as hell!
 while sleep 1; do
     # wait while device is "used"
-    if [ "$(cat $devpath/usbip_status 2>/dev/null || echo 0)" -ne $SDEV_ST_USED ]; then
-        break
-    fi
+    read -r status < "$devpath/usbip_status"
+    if [ "$status" -ne "$SDEV_ST_USED" ]; then break; fi
 done
 # cleanup will be called automatically
