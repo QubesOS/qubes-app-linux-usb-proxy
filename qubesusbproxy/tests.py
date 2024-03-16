@@ -140,7 +140,7 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
         # TODO: check qubesdb entries
         self.assertEqual(self.frontend.run_service('qubes.USBAttach',
             user='root',
-            input="{} {}".format(self.backend.name, self.dummy_usb_dev)), 0,
+            input="{} {}\n".format(self.backend.name, self.dummy_usb_dev)), 0,
             "qubes.USBAttach call failed")
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
             wait=True), 0,
@@ -148,7 +148,7 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
         # TODO: check qubesdb entries
         self.assertEqual(self.frontend.run_service('qubes.USBDetach',
             user='root',
-            input="{} {}".format(self.backend.name, self.dummy_usb_dev)), 0,
+            input="{} {}\n".format(self.backend.name, self.dummy_usb_dev)), 0,
             "qubes.USBDetach call failed")
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234', wait=True), 1,
             "Device disconnection failed")
@@ -158,14 +158,14 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
         # TODO: check qubesdb entries
         self.assertEqual(self.frontend.run_service('qubes.USBAttach',
             user='root',
-            input="{} {}".format(self.backend.name, "0x1234.0x1234")), 0,
+            input="{} {}\n".format(self.backend.name, "0x1234.0x1234")), 0,
             "qubes.USBAttach call failed")
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234', wait=True), 0,
             "Device connection failed")
         # TODO: check qubesdb entries
         self.assertEqual(self.frontend.run_service('qubes.USBDetach',
             user='root',
-            input="{} {}".format(self.backend.name, "0x1234.0x1234")), 0,
+            input="{} {}\n".format(self.backend.name, "0x1234.0x1234")), 0,
             "qubes.USBDetach call failed")
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234', wait=True), 1,
             "Device disconnection failed")
@@ -174,7 +174,7 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
         self.frontend.start()
         self.assertEqual(self.frontend.run_service('qubes.USBAttach',
             user='root',
-            input="{} {}".format(self.backend.name, self.dummy_usb_dev)), 0,
+            input="{} {}\n".format(self.backend.name, self.dummy_usb_dev)), 0,
             "qubes.USBAttach call failed")
         self.assertEqual(self.frontend.run('lsusb -d 1234:1234',
             wait=True), 0,
