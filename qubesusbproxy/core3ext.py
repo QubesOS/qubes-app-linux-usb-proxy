@@ -35,6 +35,7 @@ import sys
 import tempfile
 from typing import List, Optional, Dict, Tuple
 
+import qubes.device_protocol
 import qubes.devices
 import qubes.ext
 import qubes.vm.adminvm
@@ -48,7 +49,7 @@ usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
 HWDATA_PATH = '/usr/share/hwdata'
 
 
-class USBDevice(qubes.devices.DeviceInfo):
+class USBDevice(qubes.device_protocol.DeviceInfo):
     # pylint: disable=too-few-public-methods
     def __init__(self, backend_domain, ident):
         super(USBDevice, self).__init__(
@@ -135,7 +136,7 @@ class USBDevice(qubes.devices.DeviceInfo):
         return result
 
     @property
-    def interfaces(self) -> List[qubes.devices.DeviceInterface]:
+    def interfaces(self) -> List[qubes.device_protocol.DeviceInterface]:
         """
         List of device interfaces.
 
@@ -148,7 +149,7 @@ class USBDevice(qubes.devices.DeviceInfo):
         return result
 
     @property
-    def parent_device(self) -> Optional[qubes.devices.DeviceInfo]:
+    def parent_device(self) -> Optional[qubes.device_protocol.DeviceInfo]:
         """
         The parent device, if any.
 
@@ -157,8 +158,8 @@ class USBDevice(qubes.devices.DeviceInfo):
         return None
 
     def _load_interfaces_from_qubesdb(self) \
-            -> List[qubes.devices.DeviceInterface]:
-        result = [qubes.devices.DeviceInterface.unknown()]
+            -> List[qubes.device_protocol.DeviceInterface]:
+        result = [qubes.device_protocol.DeviceInterface.unknown()]
         if not self.backend_domain.is_running():
             # don't cache this value
             return result
@@ -169,7 +170,7 @@ class USBDevice(qubes.devices.DeviceInfo):
         if not untrusted_interfaces:
             return result
         self._interfaces = result = [
-            qubes.devices.DeviceInterface(
+            qubes.device_protocol.DeviceInterface(
                 self._sanitize(ifc, safe_chars=string.hexdigits), devclass="usb"
             )
             for ifc in untrusted_interfaces.split(b':')
