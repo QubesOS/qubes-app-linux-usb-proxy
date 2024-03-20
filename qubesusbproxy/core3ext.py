@@ -5,6 +5,8 @@
 #
 # Copyright (C) 2016  Marek Marczykowski-Górecki
 #                                   <marmarek@invisiblethingslab.com>
+# Copyright (C) 2024  Piotr Bartman-Szwarc
+#                                   <prbartman@invisiblethingslab.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,7 +21,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-#
+
 import asyncio
 import collections
 import fcntl
@@ -28,49 +30,218 @@ import os
 import re
 import string
 import subprocess
+import sys
 
-import errno
 import tempfile
+from typing import List, Optional, Dict, Tuple
 
+import qubes.device_protocol
 import qubes.devices
 import qubes.ext
 import qubes.vm.adminvm
+from qubes.ext import utils
 
 usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
 usb_connected_to_re = re.compile(br"^[a-zA-Z][a-zA-Z0-9_.-]*$")
 usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
 
-class USBDevice(qubes.devices.DeviceInfo):
+HWDATA_PATH = '/usr/share/hwdata'
+
+
+class USBDevice(qubes.device_protocol.DeviceInfo):
     # pylint: disable=too-few-public-methods
     def __init__(self, backend_domain, ident):
-        super(USBDevice, self).__init__(backend_domain, ident, None)
+        super(USBDevice, self).__init__(
+            backend_domain=backend_domain, ident=ident, devclass="usb")
 
         self._qdb_ident = ident.replace('.', '_')
         self._qdb_path = '/qubes-usb-devices/' + self._qdb_ident
-        # lazy loading
-        self._description = None
-
+        self._vendor_id = None
+        self._product_id = None
 
     @property
-    def description(self):
-        if self._description is None:
-            if not self.backend_domain.is_running():
-                # don't cache this value
-                return "Unknown - domain not running"
-            untrusted_device_desc = self.backend_domain.untrusted_qdb.read(
+    def vendor(self) -> str:
+        """
+        Device vendor from local database `/usr/share/hwdata/usb.ids`
+
+        Could be empty string or "unknown".
+
+        Lazy loaded.
+        """
+        if self._vendor is None:
+            result = self._load_desc_from_qubesdb()["vendor"]
+        else:
+            result = self._vendor
+        return result
+
+    @property
+    def product(self) -> str:
+        """
+        Device name from local database `/usr/share/hwdata/usb.ids`
+
+        Could be empty string or "unknown".
+
+        Lazy loaded.
+        """
+        if self._product is None:
+            result = self._load_desc_from_qubesdb()["product"]
+        else:
+            result = self._product
+        return result
+
+    @property
+    def manufacturer(self) -> str:
+        """
+        The name of the manufacturer of the device introduced by device itself
+
+        Could be empty string or "unknown".
+
+        Lazy loaded.
+        """
+        if self._manufacturer is None:
+            result = self._load_desc_from_qubesdb()["manufacturer"]
+        else:
+            result = self._manufacturer
+        return result
+
+    @property
+    def name(self) -> str:
+        """
+        The name of the device it introduced itself with (could be empty string)
+
+        Could be empty string or "unknown".
+
+        Lazy loaded.
+        """
+        if self._name is None:
+            result = self._load_desc_from_qubesdb()["name"]
+        else:
+            result = self._name
+        return result
+
+    @property
+    def serial(self) -> str:
+        """
+        The serial number of the device it introduced itself with.
+
+        Could be empty string or "unknown".
+
+        Lazy loaded.
+        """
+        if self._serial is None:
+            result = self._load_desc_from_qubesdb()["serial"]
+        else:
+            result = self._serial
+        return result
+
+    @property
+    def interfaces(self) -> List[qubes.device_protocol.DeviceInterface]:
+        """
+        List of device interfaces.
+
+        Every device should have at least one interface.
+        """
+        if self._interfaces is None:
+            result = self._load_interfaces_from_qubesdb()
+        else:
+            result = self._interfaces
+        return result
+
+    @property
+    def parent_device(self) -> Optional[qubes.device_protocol.DeviceInfo]:
+        """
+        The parent device, if any.
+
+        A USB device has no parents.
+        """
+        return None
+
+    def _load_interfaces_from_qubesdb(self) \
+            -> List[qubes.device_protocol.DeviceInterface]:
+        result = [qubes.device_protocol.DeviceInterface.unknown()]
+        if not self.backend_domain.is_running():
+            # don't cache this value
+            return result
+        untrusted_interfaces: bytes = (
+            self.backend_domain.untrusted_qdb.read(
+                self._qdb_path + '/interfaces')
+        )
+        if not untrusted_interfaces:
+            return result
+        self._interfaces = result = [
+            qubes.device_protocol.DeviceInterface(
+                self._sanitize(ifc, safe_chars=string.hexdigits), devclass="usb"
+            )
+            for ifc in untrusted_interfaces.split(b':')
+            if ifc
+        ]
+        return result
+
+    def _load_desc_from_qubesdb(self) -> Dict[str, str]:
+        unknown = "unknown"
+        result = {"vendor": unknown,
+                  "vendor ID": "0000",
+                  "product": unknown,
+                  "product ID": "0000",
+                  "manufacturer": unknown,
+                  "name": unknown,
+                  "serial": unknown}
+        if not self.backend_domain.is_running():
+            # don't cache this value
+            return result
+        untrusted_device_desc: bytes = (
+            self.backend_domain.untrusted_qdb.read(
                 self._qdb_path + '/desc')
-            if not untrusted_device_desc:
-                return 'Unknown'
-            self._description = self._sanitize_desc(untrusted_device_desc)
-            hw_ident_match = usb_device_hw_ident_re.match(self._description)
-            if hw_ident_match:
-                self._description = self._description[
-                    len(hw_ident_match.group(0)):]
-        return self._description
+        )
+        if not untrusted_device_desc:
+            return result
+        try:
+            (untrusted_vend_prod_id, untrusted_manufacturer,
+             untrusted_name, untrusted_serial
+             ) = untrusted_device_desc.split(b' ')
+            untrusted_vendor_id, untrusted_product_id = (
+                untrusted_vend_prod_id.split(b':'))
+        except ValueError:
+            # desc doesn't contain correctly formatted data,
+            # but it is not empty. We cannot parse it,
+            # but we can still put it to the `name` just to provide
+            # some information to the user.
+            untrusted_vendor_id, untrusted_product_id = ("0000", "0000")
+            (untrusted_manufacturer, untrusted_serial) = (
+                unknown.encode() for _ in range(2))
+            untrusted_name = untrusted_device_desc.replace(b' ', b'_')
+
+        # Data successfully loaded, cache these values
+        self._vendor_id = result["vendor ID"] = self._sanitize(
+            untrusted_vendor_id)
+        self._product_id = result["product ID"] = self._sanitize(
+            untrusted_product_id)
+        vendor, product = self._get_vendor_and_product_names(
+            self._vendor_id, self._product_id)
+        self._vendor = result["vendor"] = vendor
+        self._product = result["product"] = product
+        self._manufacturer = result["manufacturer"] = (
+            self._sanitize(untrusted_manufacturer))
+        self._name = result["name"] = (self._sanitize(untrusted_name))
+        self._name = result["serial"] = (self._sanitize(untrusted_serial))
+        return result
+
+    @staticmethod
+    def _sanitize(
+            untrusted_device_desc: bytes,
+            safe_chars: str =
+            string.ascii_letters + string.digits + string.punctuation + ' '
+    ) -> str:
+        # rb'USB\x202.0\x20Camera' -> 'USB 2.0 Camera'
+        untrusted_device_desc = untrusted_device_desc.decode(
+            'unicode_escape', errors='ignore')
+        return ''.join(
+            c if c in set(safe_chars) else '_' for c in untrusted_device_desc
+        )
 
     @property
-    def frontend_domain(self):
+    def attachment(self):
         if not self.backend_domain.is_running():
             return None
         untrusted_connected_to = self.backend_domain.untrusted_qdb.read(
@@ -90,20 +261,85 @@ class USBDevice(qubes.devices.DeviceInfo):
                 untrusted_connected_to]
         except KeyError:
             self.backend_domain.log.warning(
-                'Device {} has invalid VM name in connected-to '
-                'property: '.format(self.ident, untrusted_connected_to))
+                f'Device {self.ident} has invalid VM name in connected-to '
+                f'property: {untrusted_connected_to}')
             return None
         return connected_to
 
+    @property
+    def self_identity(self) -> str:
+        """
+        Get identification of a device not related to port.
+        """
+        if self._vendor_id is None:
+            vendor_id = self._load_desc_from_qubesdb()["vendor ID"]
+        else:
+            vendor_id = self._vendor_id
+        if self._product_id is None:
+            product_id = self._load_desc_from_qubesdb()["product ID"]
+        else:
+            product_id = self._product_id
+        interfaces = ''.join(repr(ifc) for ifc in self.interfaces)
+        serial = self.serial if self.serial != "unknown" else ""
+        return \
+            f'{vendor_id}:{product_id}:{serial}:{interfaces}'
+
     @staticmethod
-    def _sanitize_desc(untrusted_device_desc):
-        untrusted_device_desc = untrusted_device_desc.decode('ascii',
-            errors='ignore')
-        safe_set = set(string.ascii_letters + string.digits +
-                       string.punctuation + ' ')
-        return ''.join(
-            c if c in safe_set else '_' for c in untrusted_device_desc
-        )
+    def _get_vendor_and_product_names(
+            vendor_id: str, product_id: str
+    ) -> Tuple[str, str]:
+        """
+        Return tuple of vendor's and product's names for the ids.
+
+        If the id is not known, return ("unknown", "unknown").
+        """
+        return (USBDevice._load_usb_known_devices()
+                .get(vendor_id, dict())
+                .get(product_id, ("unknown", "unknown"))
+                )
+
+    @staticmethod
+    def _load_usb_known_devices() -> Dict[str, Dict[str, Tuple[str, str]]]:
+        """
+        List of known device vendors, devices and interfaces.
+
+        result[vendor_id][device_id] = (vendor_name, product_name)
+        """
+        # Syntax:
+        # vendor  vendor_name                       <-- 2 spaces between
+        #       device  device_name                 <-- single tab
+        #               interface  interface_name   <-- two tabs
+        # ...
+        # C class  class_name
+        #       subclass  subclass_name         <-- single tab
+        #               prog-if  prog-if_name   <-- two tabs
+        result = {}
+        with open(HWDATA_PATH + '/usb.ids',
+                  encoding='utf-8', errors='ignore') as usb_ids:
+            for line in usb_ids.readlines():
+                line = line.rstrip()
+                if line.startswith('#'):
+                    # skip comments
+                    continue
+                elif not line:
+                    # skip empty lines
+                    continue
+                elif line.startswith('\t\t'):
+                    # skip interfaces
+                    continue
+                elif line.startswith('C '):
+                    # description of classes starts here, we can finish
+                    break
+                elif line.startswith('\t'):
+                    # save vendor, device pair
+                    device_id, _, device_name = line[1:].split(' ', 2)
+                    result[vendor_id][device_id] = vendor_name, device_name
+                else:
+                    # new vendor
+                    vendor_id, _, vendor_name = line[:].split(' ', 2)
+                    result[vendor_id] = {}
+
+        return result
 
 
 class USBProxyNotInstalled(qubes.exc.QubesException):
@@ -170,7 +406,7 @@ class USBDeviceExtension(qubes.ext.Extension):
 
     def __init__(self):
         super(USBDeviceExtension, self).__init__()
-        #include dom0 devices in listing only when usb-proxy is really
+        # include dom0 devices in listing only when usb-proxy is really
         # installed there
         self.usb_proxy_installed_in_dom0 = os.path.exists(
             '/etc/qubes-rpc/qubes.USB')
@@ -178,72 +414,37 @@ class USBDeviceExtension(qubes.ext.Extension):
 
     @qubes.ext.handler('domain-init', 'domain-load')
     def on_domain_init_load(self, vm, event):
-        '''Initialize watching for changes'''
+        """Initialize watching for changes"""
         # pylint: disable=unused-argument,no-self-use
         vm.watch_qdb_path('/qubes-usb-devices')
         if event == 'domain-load':
             # avoid building a cache on domain-init, as it isn't fully set yet,
             # and definitely isn't running yet
-            current_devices = dict((dev.ident, dev.frontend_domain)
-                for dev in self.on_device_list_usb(vm, None))
+            current_devices = {
+                dev.ident: dev.attachment
+                for dev in self.on_device_list_usb(vm, None)
+            }
             self.devices_cache[vm.name] = current_devices
         else:
             self.devices_cache[vm.name] = {}
 
-    async def _attach_and_notify(self, vm, device, options):
+    async def attach_and_notify(self, vm, device, options):
         # bypass DeviceCollection logic preventing double attach
-        await self.on_device_attach_usb(vm,
-            'device-pre-attach:usb', device, options)
-        await vm.fire_event_async('device-attach:usb',
-                device=device,
-                options=options)
+        try:
+            await self.on_device_attach_usb(
+                vm, 'device-pre-attach:usb', device, options)
+        except qubes.devices.UnrecognizedDevice:
+            return
+        await vm.fire_event_async(
+            'device-attach:usb', device=device, options=options)
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
-        '''A change in QubesDB means a change in device list'''
+        """A change in QubesDB means a change in a device list."""
         # pylint: disable=unused-argument,no-self-use
-        vm.fire_event('device-list-change:usb')
-        current_devices = dict((dev.ident, dev.frontend_domain)
-            for dev in self.on_device_list_usb(vm, None))
-
-        # compare cached devices and current devices, collect:
-        # - newly appeared devices
-        # - devices disconnected from a vm
-        # - devices connected to a vm
-        new_devices = set()
-        connected_devices = dict()
-        disconnected_devices = dict()
-        devices_cache_for_vm = self.devices_cache[vm.name]
-        for dev, connected_to in current_devices.items():
-            if dev not in devices_cache_for_vm:
-                new_devices.add(dev)
-            elif devices_cache_for_vm[dev] != current_devices[dev]:
-                if devices_cache_for_vm[dev] is not None:
-                    disconnected_devices[dev] = devices_cache_for_vm[dev]
-                if current_devices[dev] is not None:
-                    connected_devices[dev] = current_devices[dev]
-
-        self.devices_cache[vm.name] = current_devices
-        # send events about devices detached/attached outside by themselves
-        # (like device pulled out or manual qubes.USB qrexec call)
-        for dev_ident, front_vm in disconnected_devices.items():
-            dev = USBDevice(vm, dev_ident)
-            asyncio.ensure_future(front_vm.fire_event_async('device-detach:usb',
-                                                            device=dev))
-        for dev_ident, front_vm in connected_devices.items():
-            dev = USBDevice(vm, dev_ident)
-            asyncio.ensure_future(front_vm.fire_event_async('device-attach:usb',
-                                                            device=dev,
-                                                            options={}))
-        for front_vm in vm.app.domains:
-            if not front_vm.is_running():
-                continue
-            for assignment in front_vm.devices['usb'].assignments(
-                    persistent=True):
-                if assignment.backend_domain == vm and \
-                        assignment.ident in new_devices:
-                    asyncio.ensure_future(self._attach_and_notify(
-                        front_vm, assignment.device, assignment.options))
+        current_devices = dict((dev.ident, dev.attachment)
+                               for dev in self.on_device_list_usb(vm, None))
+        utils.device_list_change(self, current_devices, vm, path, USBDevice)
 
     @qubes.ext.handler('device-list:usb')
     def on_device_list_usb(self, vm, event):
@@ -259,7 +460,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         untrusted_dev_list = vm.untrusted_qdb.list('/qubes-usb-devices/')
         if not untrusted_dev_list:
             return
-        # just get list of devices, not its every property
+        # just get a list of devices, not its every property
         untrusted_dev_list = \
             set(path.split('/')[2] for path in untrusted_dev_list)
         for untrusted_qdb_ident in untrusted_dev_list:
@@ -296,30 +497,47 @@ class USBDeviceExtension(qubes.ext.Extension):
             return
 
         for dev in self.get_all_devices(vm.app):
-            if dev.frontend_domain == vm:
-                yield (dev, {})
+            if dev.attachment == vm:
+                yield (dev, {'identity': dev.self_identity})
 
     @qubes.ext.handler('device-pre-attach:usb')
     async def on_device_attach_usb(self, vm, event, device, options):
         # pylint: disable=unused-argument
+
+        if options:
+            if list(options.keys()) != ['identity']:
+                raise qubes.exc.QubesException(
+                    'USB device attach do not support user options')
+            identity = options['identity']
+            if identity != 'any' and device.self_identity != identity:
+                print(f"Unrecognized identity, skipping attachment of {device}",
+                      file=sys.stderr)
+                raise qubes.devices.UnrecognizedDevice(
+                    "Device presented identity "
+                    f"{device.self_identity} "
+                    f"does not match expected {identity}"
+                )
+
         if not vm.is_running() or vm.qid == 0:
+            # print(f"Qube is not running, skipping attachment of {device}",
+            #       file=sys.stderr)
             return
 
         if not isinstance(device, USBDevice):
+            # print("The device is not recognized as usb device, "
+            #       f"skipping attachment of {device}",
+            #       file=sys.stderr)
             return
 
-        if options:
-            raise qubes.exc.QubesException(
-                'USB device attach do not support options')
-
-        if device.frontend_domain:
+        if device.attachment:
             raise qubes.devices.DeviceAlreadyAttached(
-                'Device {!s} already attached to {!s}'.format(device,
-                    device.frontend_domain)
+                'Device {!s} already attached to {!s}'.format(
+                    device, device.attachment)
             )
 
-        stubdom_qrexec = (vm.virt_mode == 'hvm' and \
-            vm.features.check_with_template('stubdom-qrexec', False))
+        stubdom_qrexec = (
+                vm.virt_mode == 'hvm'
+                and vm.features.check_with_template('stubdom-qrexec', False))
 
         name = vm.name + '-dm' if stubdom_qrexec else vm.name
 
@@ -366,7 +584,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         if not isinstance(device, USBDevice):
             return
 
-        connected_to = device.frontend_domain
+        connected_to = device.attachment
         # detect race conditions; there is still race here, but much smaller
         if connected_to is None or connected_to.qid != vm.qid:
             raise QubesUSBException(
@@ -389,9 +607,9 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
-        for assignment in vm.devices['usb'].assignments(persistent=True):
-            device = assignment.device
-            await self.on_device_attach_usb(vm, '', device, options={})
+        for assignment in vm.devices['usb'].get_assigned_devices():
+            asyncio.ensure_future(self.attach_and_notify(
+                vm, assignment.device, assignment.options))
 
     @qubes.ext.handler('domain-shutdown')
     async def on_domain_shutdown(self, vm, _event, **_kwargs):
