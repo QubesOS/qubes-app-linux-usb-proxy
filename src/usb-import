@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/bin/sh --
 
-command -v modprobe >/dev/null && (modprobe vhci-hcd || exit 1)
+set -eu
+if command -v modprobe >/dev/null; then modprobe vhci-hcd; fi
 
 DEVPATH="/sys/devices/platform/vhci_hcd"
 if [ -d "${DEVPATH}.0" ]; then
@@ -39,7 +40,7 @@ if [ -n "$SERVICE_ATTACH_PID" ]; then
     # use stderr of qubes.USBAttach service call
     # otherwise it would be redirected to /dev/null
     # (see comment in qubes.USBAttach)
-    exec 2>/proc/$SERVICE_ATTACH_PID/fd/2
+    exec 2>"/proc/$SERVICE_ATTACH_PID/fd/2"
 fi
 
 # based on linux/tools/usb/usbip/libsrc/vhci_driver.c
@@ -51,25 +52,21 @@ find_port() {
         if [ "$hub" = "port" ] || [ "$hub" = "prt" ]; then
             # old header:
             #   port sta spd bus dev socket local_busid
-            if [ "$requested_hub" = "ss" ]; then
-                echo "USB SuperSpeed require kernel >= 4.13" >&2
-                exit 1
-            fi
-            old_header=1
-            continue
+            echo "kernel < 4.13 no longer supported" >&2
+            exit 1
         elif [ "$hub" = "hub" ]; then
             # new header
             #   hub port sta spd bus dev socket local_busid
             continue
         elif [ -n "$old_header" ] && [ "$port" -eq $VDEV_ST_NULL ]; then
             # port column in old header
-            echo $hub
-            return 0
+            echo "kernel < 4.13 no longer supported" >&2
+            exit 1
         elif [ -z "$old_header" ] && [ "$hub" = "$requested_hub" ] && [ "$sta" -eq $VDEV_ST_NULL ]; then
-            echo $port
+            echo "$port"
             return 0
         fi
-    done < $DEVPATH/status
+    done < "$DEVPATH/status"
     ERROR "No unused port found!"
 }
 
@@ -85,9 +82,12 @@ wait_for_attached() {
     local port="$1"
     local local_busid="0-0"
     local timeout=25
-    while [ ! -e /sys/bus/usb/devices/$local_busid ]; do
+    while [ ! -e "/sys/bus/usb/devices/$local_busid" ]; do
         sleep 0.2
-        port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
+        if ! port_status=$(grep -- "^\\(hs\\|ss\\)\\? *$port" "$DEVPATH/status"); then
+            local status="$?"
+            if [[ "$status" -gt 1 ]]; then exit "$status"; fi
+        fi
         local_busid=${port_status##* }
         timeout=$(( timeout - 1 ))
         if [ "$timeout" -le 0 ]; then
@@ -102,12 +102,15 @@ wait_for_detached() {
     local port="$1"
     local local_busid
     local port_status
-    port_status=$(grep "^\(hs\|ss\)\? *$port" $DEVPATH/status)
+    if ! port_status=$(grep -- "^\\(hs\\|ss\\)\\? *$port" "$DEVPATH/status"); then
+        local status="$?"
+        if [[ "$status" -gt 1 ]]; then exit "$status"; fi
+    fi
     local_busid=${port_status##* }
     if [ -z "$local_busid" ]; then
         return
     fi
-    while [ -e /sys/bus/usb/devices/$local_busid ]; do
+    while [ -e "/sys/bus/usb/devices/$local_busid" ]; do
         sleep 1
     done
 }
@@ -117,7 +120,7 @@ wait_for_detached() {
 read untrusted_devid untrusted_speed untrusted_extra
 
 # check for unexpected EOF
-if [ -z "$untrusted_devid" -a -z "$untrusted_speed" ]; then
+if [ -z "$untrusted_devid" ] && [ -z "$untrusted_speed" ]; then
     echo "No device info received, connection failed, check backend side for details" >&2
     exit 1
 fi
@@ -157,7 +160,7 @@ kill -USR1 "$QREXEC_AGENT_PID" || exit 1
 
 attach "$port" "$devid" "$speed" || exit 1
 
-echo $port >"$statefile"
+echo "$port" >"$statefile"
 
 # wait for device really being attached
 wait_for_attached "$port"
@@ -168,7 +171,7 @@ if [ -n "$SERVICE_ATTACH_PID" ]; then
 fi
 
 # close stdin/out so the kernel is the only one with the socket reference
-exec <&- >&- 2>&-
+exec < /dev/null >/dev/null 2>&1
 
 # do not end the process until device is detached, to not close the qrexec connection
 wait_for_detached "$port"
