@@ -1,3 +1,14 @@
+qubes-usb-proxy (1.2.0) unstable; urgency=medium
+
+  [ Marek Marczykowski-Górecki ]
+  * tests: add trailing newline to qubes.USBAttach input
+
+  [ Demi Marie Obenour ]
+  * Clean up various shell scripts
+  * Support devices blocked by usbguard
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 27 Mar 2024 21:16:29 +0100
+
 qubes-usb-proxy (1.1.5) unstable; urgency=medium
 
   [ Frédéric Pierret (fepitre) ]
