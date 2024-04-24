@@ -236,8 +236,9 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
         # rb'USB\x202.0\x20Camera' -> 'USB 2.0 Camera'
         untrusted_device_desc = untrusted_device_desc.decode(
             'unicode_escape', errors='ignore')
+        safe_chars_set = set(safe_chars)
         return ''.join(
-            c if c in set(safe_chars) else '_' for c in untrusted_device_desc
+            c if c in safe_chars_set else '_' for c in untrusted_device_desc
         )
 
     @property
