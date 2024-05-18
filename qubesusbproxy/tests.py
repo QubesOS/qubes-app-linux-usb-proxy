@@ -395,7 +395,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                            wait=True), 0,
                          "Device connection failed")
 
-        self.assertEquals(usb_dev.attachment,
+        self.assertEqual(usb_dev.attachment,
                           self.frontend)
 
     def test_020_attach(self):

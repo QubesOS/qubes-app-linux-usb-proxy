@@ -609,8 +609,8 @@ class USBDeviceExtension(qubes.ext.Extension):
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
         for assignment in vm.devices['usb'].get_assigned_devices():
-            asyncio.ensure_future(self.attach_and_notify(
-                vm, assignment.device, assignment.options))
+            await self.attach_and_notify(
+                vm, assignment.device, assignment.options)
 
     @qubes.ext.handler('domain-shutdown')
     async def on_domain_shutdown(self, vm, _event, **_kwargs):
