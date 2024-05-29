@@ -207,7 +207,7 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
             # but it is not empty. We cannot parse it,
             # but we can still put it to the `name` just to provide
             # some information to the user.
-            untrusted_vendor_id, untrusted_product_id = ("0000", "0000")
+            untrusted_vendor_id, untrusted_product_id = (b"0000", b"0000")
             (untrusted_manufacturer, untrusted_serial) = (
                 unknown.encode() for _ in range(2))
             untrusted_name = untrusted_device_desc.replace(b' ', b'_')
