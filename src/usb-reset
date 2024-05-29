@@ -1,0 +1,25 @@
+#!/usr/bin/python3
+
+import sys
+import os
+import fcntl
+from pathlib import Path
+
+# from /usr/include/linux/usbdevice_fs.h
+# _IO('U', 20)
+USBDEVFS_RESET = 0x5514
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: usb-reset sysfs-devpath", file=sys.stderr())
+        exit(2)
+    devpath = sys.argv[1]
+    uevent = (Path(devpath) / "uevent").read_text()
+    devname = [line.partition("=")[2]
+               for line in uevent.splitlines()
+               if line.startswith("DEVNAME=")][0]
+    with (Path("/dev") / devname).open("w") as dev_f:
+        fcntl.ioctl(dev_f, USBDEVFS_RESET, 0)
+
+if __name__ == "__main__":
+    main()

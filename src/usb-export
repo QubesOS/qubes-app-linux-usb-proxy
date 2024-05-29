@@ -108,6 +108,16 @@ fi
 printf 'add %s' "$busid" > "$SYS_USBIP_HOST/match_busid" || exit 1
 if [ -n "$attach_to_usbip" ]; then
     echo "$busid" > "$SYS_USBIP_HOST/bind" || exit 1
+
+    # optionally reset the device to clear any state from previous driver
+    reset_on_attach=$(udevadm info --query=property \
+        --value --property=QUBES_USB_RESET --path="$devpath")
+    if [ -f /run/qubes-service/usb-reset-on-attach ]; then
+        reset_on_attach=1
+    fi
+    if [ -n "$reset_on_attach" ]; then
+        /usr/lib/qubes/usb-reset "$devpath"
+    fi
 fi
 
 # One more safety check - make sure the device is available
