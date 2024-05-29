@@ -93,14 +93,22 @@ modprobe usbip-host
 # Request that both IN and OUT be handled on a single (stdin) socket
 kill -USR1 "$QREXEC_AGENT_PID" || exit 1
 
+attach_to_usbip=true
 # Unbind the device from the driver
 if [ -d "$devpath/driver" ]; then
-    printf %s "$busid" > "$devpath/driver/unbind" || exit 1
+    old_driver=$(readlink -f "$devpath/driver")
+    if [ "$old_driver" != "$SYS_USBIP_HOST" ]; then
+        printf %s "$busid" > "$devpath/driver/unbind" || exit 1
+    else
+        attach_to_usbip=
+    fi
 fi
 
 # Bind to the usbip-host driver
 printf 'add %s' "$busid" > "$SYS_USBIP_HOST/match_busid" || exit 1
-echo "$busid" > "$SYS_USBIP_HOST/bind" || exit 1
+if [ -n "$attach_to_usbip" ]; then
+    echo "$busid" > "$SYS_USBIP_HOST/bind" || exit 1
+fi
 
 # One more safety check - make sure the device is available
 read status < "$devpath/usbip_status"
