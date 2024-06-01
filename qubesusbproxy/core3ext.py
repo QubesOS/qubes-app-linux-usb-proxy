@@ -22,7 +22,6 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-import asyncio
 import collections
 import fcntl
 import grp
@@ -35,11 +34,52 @@ import sys
 import tempfile
 from typing import List, Optional, Dict, Tuple
 
-import qubes.device_protocol
+try:
+    from qubes.device_protocol import DeviceInfo
+    from qubes.device_protocol import DeviceInterface
+    from qubes.ext import utils
+    from qubes.devices import UnrecognizedDevice
+except ImportError:
+    # This extension supports both the legacy and new device API.
+    # In the case of the legacy backend, functionality is limited.
+    from qubes.devices import DeviceInfo as LegacyDeviceInfo
+    import qubesusbproxy.utils
+
+    class DescriptionOverrider:
+        @property
+        def description(self):
+            return self.vendor + " " + self.product
+
+    class DeviceInfo(DescriptionOverrider, LegacyDeviceInfo):
+        def __init__(self, *args, **kwargs):
+            # not supported options in legacy code
+            del kwargs['devclass']
+            kwargs['description'] = 'foo'
+            self.safe_chars = self.safe_chars.replace(' ', '')
+            super().__init__(*args, **kwargs)
+
+            # needed but not in legacy DeviceInfo
+            self._vendor = None
+            self._product = None
+            self._manufacturer = None
+            self._name = None
+            self._serial = None
+            # `_load_interfaces_from_qubesdb` will never be called
+            self._interfaces = "?******"
+
+    @property
+    def fronted_domain(self):
+        return self.attachment
+
+    class DeviceInterface:
+        pass
+
+    class UnrecognizedDevice(ValueError):
+        pass
+
 import qubes.devices
 import qubes.ext
 import qubes.vm.adminvm
-from qubes.ext import utils
 
 usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
@@ -49,9 +89,12 @@ usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
 HWDATA_PATH = '/usr/share/hwdata'
 
 
-class USBDevice(qubes.device_protocol.DeviceInfo):
+class USBDevice(DeviceInfo):
     # pylint: disable=too-few-public-methods
     def __init__(self, backend_domain, ident):
+        # the superclass can restrict the allowed characters
+        self.safe_chars = (string.ascii_letters + string.digits
+                           + string.punctuation + ' ')
         super(USBDevice, self).__init__(
             backend_domain=backend_domain, ident=ident, devclass="usb")
 
@@ -136,7 +179,7 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
         return result
 
     @property
-    def interfaces(self) -> List[qubes.device_protocol.DeviceInterface]:
+    def interfaces(self) -> List[DeviceInterface]:
         """
         List of device interfaces.
 
@@ -149,7 +192,7 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
         return result
 
     @property
-    def parent_device(self) -> Optional[qubes.device_protocol.DeviceInfo]:
+    def parent_device(self) -> Optional[DeviceInfo]:
         """
         The parent device, if any.
 
@@ -157,9 +200,8 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
         """
         return None
 
-    def _load_interfaces_from_qubesdb(self) \
-            -> List[qubes.device_protocol.DeviceInterface]:
-        result = [qubes.device_protocol.DeviceInterface.unknown()]
+    def _load_interfaces_from_qubesdb(self) -> List[DeviceInterface]:
+        result = [DeviceInterface.unknown()]
         if not self.backend_domain.is_running():
             # don't cache this value
             return result
@@ -170,7 +212,7 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
         if not untrusted_interfaces:
             return result
         self._interfaces = result = [
-            qubes.device_protocol.DeviceInterface(
+            DeviceInterface(
                 self._sanitize(ifc, safe_chars=string.hexdigits), devclass="usb"
             )
             for ifc in untrusted_interfaces.split(b':')
@@ -219,21 +261,21 @@ class USBDevice(qubes.device_protocol.DeviceInfo):
             untrusted_product_id)
         vendor, product = self._get_vendor_and_product_names(
             self._vendor_id, self._product_id)
-        self._vendor = result["vendor"] = vendor
-        self._product = result["product"] = product
+        self._vendor = result["vendor"] = self._sanitize(vendor.encode())
+        self._product = result["product"] = self._sanitize(product.encode())
         self._manufacturer = result["manufacturer"] = (
             self._sanitize(untrusted_manufacturer))
-        self._name = result["name"] = (self._sanitize(untrusted_name))
-        self._name = result["serial"] = (self._sanitize(untrusted_serial))
+        self._name = result["name"] = self._sanitize(untrusted_name)
+        self._name = result["serial"] = self._sanitize(untrusted_serial)
         return result
 
-    @staticmethod
     def _sanitize(
-            untrusted_device_desc: bytes,
-            safe_chars: str =
-            string.ascii_letters + string.digits + string.punctuation + ' '
+            self, untrusted_device_desc: bytes,
+            safe_chars: Optional[str] = None
     ) -> str:
         # rb'USB\x202.0\x20Camera' -> 'USB 2.0 Camera'
+        if safe_chars is None:
+            safe_chars = self.safe_chars
         untrusted_device_desc = untrusted_device_desc.decode(
             'unicode_escape', errors='ignore')
         safe_chars_set = set(safe_chars)
@@ -434,7 +476,7 @@ class USBDeviceExtension(qubes.ext.Extension):
         try:
             await self.on_device_attach_usb(
                 vm, 'device-pre-attach:usb', device, options)
-        except qubes.devices.UnrecognizedDevice:
+        except UnrecognizedDevice:
             return
         await vm.fire_event_async(
             'device-attach:usb', device=device, options=options)
@@ -513,7 +555,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             if identity != 'any' and device.self_identity != identity:
                 print(f"Unrecognized identity, skipping attachment of {device}",
                       file=sys.stderr)
-                raise qubes.devices.UnrecognizedDevice(
+                raise UnrecognizedDevice(
                     "Device presented identity "
                     f"{device.self_identity} "
                     f"does not match expected {identity}"
