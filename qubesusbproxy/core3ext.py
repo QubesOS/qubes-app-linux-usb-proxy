@@ -39,11 +39,14 @@ try:
     from qubes.device_protocol import DeviceInterface
     from qubes.ext import utils
     from qubes.devices import UnrecognizedDevice
+
+    def get_assigned_devices(devices):
+        yield from devices.get_assigned_devices()
 except ImportError:
     # This extension supports both the legacy and new device API.
     # In the case of the legacy backend, functionality is limited.
     from qubes.devices import DeviceInfo as LegacyDeviceInfo
-    import qubesusbproxy.utils
+    from qubesusbproxy import utils
 
     class DescriptionOverrider:
         @property
@@ -76,6 +79,10 @@ except ImportError:
 
     class UnrecognizedDevice(ValueError):
         pass
+
+    def get_assigned_devices(devices):
+        yield from devices.assignments(persistent=True)
+
 
 import qubes.devices
 import qubes.ext
@@ -650,7 +657,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
-        for assignment in vm.devices['usb'].get_assigned_devices():
+        for assignment in get_assigned_devices(vm.devices['usb']):
             await self.attach_and_notify(
                 vm, assignment.device, assignment.options)
 

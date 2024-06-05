@@ -57,7 +57,8 @@ def device_list_change(
     for front_vm in vm.app.domains:
         if not front_vm.is_running():
             continue
-        for assignment in front_vm.devices[devclass].get_assigned_devices():
+        for assignment in front_vm.devices[devclass].assignments(
+                persistent=True):
             if (assignment.backend_domain == vm
                     and assignment.ident in added
                     and assignment.ident not in attached
