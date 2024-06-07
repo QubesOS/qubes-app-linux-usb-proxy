@@ -27,10 +27,34 @@ import time
 
 core2 = False
 core3 = False
+legacy = False
 try:
     import qubesusbproxy.core3ext
-    import qubes.devices
     import asyncio
+
+    try:
+        from qubes.device_protocol import DeviceAssignment
+
+        def assign(test, collection, assignment):
+            test.loop.run_until_complete(collection.assign(assignment))
+
+        def unassign(test, collection, assignment):
+            test.loop.run_until_complete(collection.unassign(assignment))
+
+        AUTO_ATTACH = {"attach_automatically": True, "required": True}
+    except ImportError:
+        # This extension supports both the legacy and new device API.
+        # In the case of the legacy backend, functionality is limited.
+        from qubes.devices import DeviceAssignment
+
+        def assign(test, collection, assignment):
+            test.loop.run_until_complete(collection.attach(assignment))
+
+        def unassign(test, collection, assignment):
+            test.loop.run_until_complete(collection.detach(assignment))
+        
+        legacy = True
+        AUTO_ATTACH = {"persistent": True}
 
     core3 = True
 except ImportError:
@@ -380,11 +404,9 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
     def test_010_assign(self):
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident,
-                                             attach_automatically=True,
-                                             required=True)
-        self.loop.run_until_complete(
-            self.frontend.devices['usb'].assign(ass))
+        ass = DeviceAssignment(
+            self.backend, self.usbdev_ident, **AUTO_ATTACH)
+        assign(self, self.frontend.devices['usb'], ass)
         self.assertIsNone(usb_dev.attachment)
         try:
             self.frontend.start()
@@ -395,13 +417,12 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                            wait=True), 0,
                          "Device connection failed")
 
-        self.assertEqual(usb_dev.attachment,
-                          self.frontend)
+        self.assertEqual(usb_dev.attachment, self.frontend)
 
     def test_020_attach(self):
         self.frontend.start()
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         try:
             self.loop.run_until_complete(
                 self.frontend.devices['usb'].attach(ass))
@@ -412,13 +433,12 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                            wait=True), 0,
                          "Device connection failed")
 
-        self.assertEquals(usb_dev.attachment,
-                          self.frontend)
+        self.assertEquals(usb_dev.attachment, self.frontend)
 
     def test_030_detach(self):
         self.frontend.start()
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         try:
             self.loop.run_until_complete(
                 self.frontend.devices['usb'].attach(ass))
@@ -438,14 +458,11 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
     def test_040_unassign(self):
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident,
-                                             attach_automatically=True,
-                                             required=True)
-        self.loop.run_until_complete(
-            self.frontend.devices['usb'].assign(ass))
+        ass = DeviceAssignment(
+            self.backend, self.usbdev_ident, **AUTO_ATTACH)
+        assign(self, self.frontend.devices['usb'], ass)
         self.assertIsNone(usb_dev.attachment)
-        self.loop.run_until_complete(
-            self.frontend.devices['usb'].unassign(ass))
+        unassign(self, self.frontend.devices['usb'], ass)
         self.assertIsNone(usb_dev.attachment)
 
     def test_050_list_attached(self):
@@ -454,7 +471,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         usb_list = self.backend.devices['usb']
 
         usb_list_front_pre = list(self.frontend.devices['usb'])
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
 
         try:
             self.loop.run_until_complete(
@@ -466,8 +483,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                            wait=True), 0,
                          "Device connection failed")
 
-        self.assertEquals(usb_list[self.usbdev_ident].attachment,
-                          self.frontend)
+        self.assertEquals(usb_list[self.usbdev_ident].attachment, self.frontend)
 
         usb_list_front_post = list(self.frontend.devices['usb'])
 
@@ -476,7 +492,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
     def test_060_auto_detach_on_remove(self):
         self.frontend.start()
         usb_list = self.backend.devices['usb']
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         try:
             self.loop.run_until_complete(
                 self.frontend.devices['usb'].attach(ass))
@@ -495,12 +511,10 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
     def test_061_auto_attach_on_reconnect(self):
         self.frontend.start()
         usb_list = self.backend.devices['usb']
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident,
-                                             attach_automatically=True,
-                                             required=True)
+        ass = DeviceAssignment(
+            self.backend, self.usbdev_ident, **AUTO_ATTACH)
         try:
-            self.loop.run_until_complete(
-                self.frontend.devices['usb'].assign(ass))
+            assign(self, self.frontend.devices['usb'], ass)
         except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
             self.skipTest(str(e))
 
@@ -530,7 +544,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                     user="root", wait=True)
         if retcode != 0:
             raise RuntimeError("Failed to simulate not installed package")
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         with self.assertRaises(qubesusbproxy.core3ext.USBProxyNotInstalled):
             self.loop.run_until_complete(
                 self.frontend.devices['usb'].attach(ass))
@@ -543,7 +557,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                    user="root", wait=True)
         if retcode != 0:
             raise RuntimeError("Failed to simulate not installed package")
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         try:
             with self.assertRaises(qubesusbproxy.core3ext.USBProxyNotInstalled):
                 self.loop.run_until_complete(
@@ -560,7 +574,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                 '/etc/qubes-rpc/policy/qubes.USB+{}'.format(self.usbdev_ident),
                 'w+') as policy_file:
             policy_file.write('# empty policy\n')
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         self.loop.run_until_complete(
             self.frontend.devices['usb'].attach(ass))
 
@@ -569,7 +583,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         self.frontend.virt_mode = 'hvm'
         self.frontend.features['stubdom-qrexec'] = True
         self.frontend.start()
-        ass = qubes.devices.DeviceAssignment(self.backend, self.usbdev_ident)
+        ass = DeviceAssignment(self.backend, self.usbdev_ident)
         try:
             self.loop.run_until_complete(
                 self.frontend.devices['usb'].attach(ass))

@@ -51,7 +51,7 @@ except ImportError:
     class DescriptionOverrider:
         @property
         def description(self):
-            return self.vendor + " " + self.product
+            return self.name
 
     class DeviceInfo(DescriptionOverrider, LegacyDeviceInfo):
         def __init__(self, *args, **kwargs):
@@ -70,9 +70,9 @@ except ImportError:
             # `_load_interfaces_from_qubesdb` will never be called
             self._interfaces = "?******"
 
-    @property
-    def fronted_domain(self):
-        return self.attachment
+        @property
+        def frontend_domain(self):
+            return self.attachment
 
     class DeviceInterface:
         pass
