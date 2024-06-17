@@ -57,7 +57,6 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             # not supported options in legacy code
             del kwargs['devclass']
-            kwargs['description'] = 'foo'
             self.safe_chars = self.safe_chars.replace(' ', '')
             super().__init__(*args, **kwargs)
 
