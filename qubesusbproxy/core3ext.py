@@ -298,7 +298,11 @@ class USBDevice(DeviceInfo):
                     if i >= len(untrusted_device_desc):
                         break
                     hex_code = untrusted_device_desc[i - 1: i + 1]
-                    c = chr(int(hex_code, base=16))
+                    try:
+                        hex_value = int(hex_code, 16)
+                        c = chr(hex_value)
+                    except ValueError:
+                        c = '_'
 
             if c in safe_chars_set:
                 result += c
