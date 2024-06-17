@@ -283,12 +283,30 @@ class USBDevice(DeviceInfo):
         # rb'USB\x202.0\x20Camera' -> 'USB 2.0 Camera'
         if safe_chars is None:
             safe_chars = self.safe_chars
-        untrusted_device_desc = untrusted_device_desc.decode(
-            'unicode_escape', errors='ignore')
         safe_chars_set = set(safe_chars)
-        return ''.join(
-            c if c in safe_chars_set else '_' for c in untrusted_device_desc
-        )
+
+        result = ""
+        i = 0
+        while i < len(untrusted_device_desc):
+            c = chr(untrusted_device_desc[i])
+            if c == '\\':
+                i += 1
+                if i >= len(untrusted_device_desc):
+                    break
+                c = chr(untrusted_device_desc[i])
+                if c == 'x':
+                    i += 2
+                    if i >= len(untrusted_device_desc):
+                        break
+                    hex_code = untrusted_device_desc[i - 1: i + 1]
+                    c = chr(int(hex_code, base=16))
+
+            if c in safe_chars_set:
+                result += c
+            else:
+                result += '_'
+            i += 1
+        return result
 
     @property
     def attachment(self):
