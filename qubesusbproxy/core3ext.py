@@ -299,8 +299,8 @@ class USBDevice(DeviceInfo):
                         break
                     hex_code = untrusted_device_desc[i - 1: i + 1]
                     try:
-                        for i in range(2):
-                            if hex_code[i] not in b'0123456789abcdefABCDEF':
+                        for j in range(2):
+                            if hex_code[j] not in b'0123456789abcdefABCDEF':
                                 raise ValueError()
                         hex_value = int(hex_code, 16)
                         c = chr(hex_value)
