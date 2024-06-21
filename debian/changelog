@@ -1,3 +1,34 @@
+qubes-usb-proxy (1.3.0) unstable; urgency=medium
+
+  [ Piotr Bartman ]
+  * q-dev: implement part of new API for DeviceInfo
+  * q-dev: events
+  * q-dev: DeviceInterface
+  * q-dev: assignments -> get_assigned_devices
+  * q-dev: fire device-attach on domain start
+  * q-dev: usb device full identity
+  * q-dev: frontend_device -> attachment
+  * q-dev: implementation of self_identity
+  * q-dev: port assignment
+  * q-dev: use ext/utils
+  * q-dev: device protocol
+  * q-dev: minor optimization
+
+  [ Piotr Bartman-Szwarc ]
+  * q-dev: update integ tests
+  * q-dev: fix attaching usb devices on domain start
+  * q-dev: small fix for unknown devices
+  * q-dev: keep partial backward compatibility
+  * q-dev: keep partial backward compatibility for auto-attachment
+  * q-dev: keep partial backward compatibility in tests
+  * q-dev: do not use unicode_escape
+  * q-dev: cleanup
+  * q-dev: handle invalid values
+  * q-dev: handle invalid values
+  * q-dev: fix loop
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 21 Jun 2024 15:29:50 +0200
+
 qubes-usb-proxy (1.2.2) unstable; urgency=medium
 
   * Do not needlessly reattach device to usbip-host
