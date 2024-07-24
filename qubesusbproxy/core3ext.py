@@ -54,11 +54,10 @@ except ImportError:
             return self.name
 
     class DeviceInfo(DescriptionOverrider, LegacyDeviceInfo):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, port):
             # not supported options in legacy code
-            del kwargs['devclass']
             self.safe_chars = self.safe_chars.replace(' ', '')
-            super().__init__(*args, **kwargs)
+            super().__init__(port.backend_domain, port.ident)
 
             # needed but not in legacy DeviceInfo
             self._vendor = None
@@ -101,8 +100,9 @@ class USBDevice(DeviceInfo):
         # the superclass can restrict the allowed characters
         self.safe_chars = (string.ascii_letters + string.digits
                            + string.punctuation + ' ')
-        super(USBDevice, self).__init__(
+        port = qubes.device_protocol.Port(
             backend_domain=backend_domain, ident=ident, devclass="usb")
+        super(USBDevice, self).__init__(port)
 
         self._qdb_ident = ident.replace('.', '_')
         self._qdb_path = '/qubes-usb-devices/' + self._qdb_ident
