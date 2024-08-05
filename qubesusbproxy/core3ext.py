@@ -502,15 +502,25 @@ class USBDeviceExtension(qubes.ext.Extension):
         else:
             self.devices_cache[vm.name] = {}
 
-    async def attach_and_notify(self, vm, device, options):
+    async def attach_and_notify(self, vm, assignment):
         # bypass DeviceCollection logic preventing double attach
         try:
+            identity = assignment.device_identity
+            device = assignment.device
+            if identity not in ('any', device.self_identity):
+                print("Unrecognized identity, skipping attachment of device"
+                      f" in port {assignment}", file=sys.stderr)
+                raise UnrecognizedDevice(
+                    "Device presented identity "
+                    f"{device.self_identity} "
+                    f"does not match expected {identity}"
+                )
             await self.on_device_attach_usb(
-                vm, 'device-pre-attach:usb', device, options)
+                vm, 'device-pre-attach:usb', device, assignment.options)
         except UnrecognizedDevice:
             return
         await vm.fire_event_async(
-            'device-attach:usb', device=device, options=options)
+            'device-attach:usb', device=device, options=assignment.options)
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
@@ -579,18 +589,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         # pylint: disable=unused-argument
 
         if options:
-            if list(options.keys()) != ['identity']:
-                raise qubes.exc.QubesException(
-                    'USB device attach do not support user options')
-            identity = options['identity']
-            if identity != 'any' and device.self_identity != identity:
-                print(f"Unrecognized identity, skipping attachment of {device}",
-                      file=sys.stderr)
-                raise UnrecognizedDevice(
-                    "Device presented identity "
-                    f"{device.self_identity} "
-                    f"does not match expected {identity}"
-                )
+            raise qubes.exc.QubesException(
+                'USB device attach do not support user options')
 
         if not vm.is_running() or vm.qid == 0:
             # print(f"Qube is not running, skipping attachment of {device}",
