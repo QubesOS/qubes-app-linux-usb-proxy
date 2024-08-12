@@ -60,8 +60,8 @@ def device_list_change(
         for assignment in front_vm.devices[devclass].assignments(
                 persistent=True):
             if (assignment.backend_domain == vm
-                    and assignment.ident in added
-                    and assignment.ident not in attached
+                    and assignment.port_id in added
+                    and assignment.port_id not in attached
             ):
                 asyncio.ensure_future(ext.attach_and_notify(
                     front_vm, assignment.device, assignment.options))
@@ -69,10 +69,10 @@ def device_list_change(
 
 def compare_device_cache(vm, devices_cache, current_devices):
     # compare cached devices and current devices, collect:
-    # - newly appeared devices (ident)
-    # - devices attached from a vm to frontend vm (ident: frontend_vm)
-    # - devices detached from frontend vm (ident: frontend_vm)
-    # - disappeared devices, e.g., plugged out (ident)
+    # - newly appeared devices (port_id)
+    # - devices attached from a vm to frontend vm (port_id: frontend_vm)
+    # - devices detached from frontend vm (port_id: frontend_vm)
+    # - disappeared devices, e.g., plugged out (port_id)
     added = set()
     attached = {}
     detached = {}
