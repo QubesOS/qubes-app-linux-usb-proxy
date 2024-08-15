@@ -658,30 +658,28 @@ class USBDeviceExtension(qubes.ext.Extension):
                 policy_line, False)
 
     @qubes.ext.handler('device-pre-detach:usb')
-    async def on_device_detach_usb(self, vm, event, device):
+    async def on_device_detach_usb(self, vm, event, port):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running() or vm.qid == 0:
             return
 
-        if not isinstance(device, USBDevice):
-            return
-
-        connected_to = device.attachment
-        # detect race conditions; there is still race here, but much smaller
-        if connected_to is None or connected_to.qid != vm.qid:
+        for attached, options in self.on_device_list_attached(vm, event):
+            if attached.port == port:
+                break
+        else:
             raise QubesUSBException(
-                "Device {!s} not connected to VM {}".format(
-                    device, vm.name))
+                f"Device {port} not connected to VM {vm.name}")
 
         # update the cache before the call, to avoid sending duplicated events
         # (one on qubesdb watch and the other by the caller of this method)
-        self.devices_cache[device.backend_domain.name][device.port_id] = None
+        backend = attached
+        self.devices_cache[backend][attached.port_id] = None
 
         try:
-            await device.backend_domain.run_service_for_stdio(
+            await backend.backend_domain.run_service_for_stdio(
                 'qubes.USBDetach',
                 user='root',
-                input='{}\n'.format(device.port_id).encode())
+                input='{}\n'.format(backend.port_id).encode())
         except subprocess.CalledProcessError as e:
             # TODO: sanitize and include stdout
             raise QubesUSBException('Device detach failed')
