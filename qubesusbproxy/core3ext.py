@@ -505,14 +505,13 @@ class USBDeviceExtension(qubes.ext.Extension):
     async def attach_and_notify(self, vm, assignment):
         # bypass DeviceCollection logic preventing double attach
         try:
-            identity = assignment.device_identity
+            identity = assignment.device_id
             device = assignment.device
-            if identity not in ('any', device.device_id):
-                print("Unrecognized identity, skipping attachment of device"
-                      f" in port {assignment}", file=sys.stderr)
-                raise UnrecognizedDevice(
-                    "Device presented identity "
-                    f"{device.device_id} "
+            if identity not in ('*', device.device_id):
+                print("Unrecognized identity, skipping attachment of device "
+                      f"from the port {assignment}", file=sys.stderr)
+                raise qubes.devices.UnrecognizedDevice(
+                    f"Device presented identity {device.device_id} "
                     f"does not match expected {identity}"
                 )
 
@@ -588,7 +587,7 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         for dev in self.get_all_devices(vm.app):
             if dev.attachment == vm:
-                yield (dev, {'identity': dev.device_id})
+                yield (dev, {})
 
     @qubes.ext.handler('device-pre-attach:usb')
     async def on_device_attach_usb(self, vm, event, device, options):
