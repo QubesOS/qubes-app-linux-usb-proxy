@@ -19,13 +19,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
 # USA.
 import asyncio
+import subprocess
 
 import qubes
+
+from typing import Type
+
+from qubes import device_protocol
+from qubes.device_protocol import VirtualDevice
 
 
 def device_list_change(
         ext: qubes.ext.Extension, current_devices,
-        vm, path, device_class
+        vm, path, device_class: Type[qubes.device_protocol.DeviceInfo]
 ):
     devclass = device_class.__name__[:-len('Device')].lower()
 
@@ -39,7 +45,7 @@ def device_list_change(
     for dev_id, front_vm in detached.items():
         dev = device_class(vm, dev_id)
         asyncio.ensure_future(front_vm.fire_event_async(
-            f'device-detach:{devclass}', port=dev))
+            f'device-detach:{devclass}', port=dev.port))
     for dev_id in removed:
         device = device_class(vm, dev_id)
         vm.fire_event(f'device-removed:{devclass}', device=device)
@@ -54,17 +60,42 @@ def device_list_change(
 
     ext.devices_cache[vm.name] = current_devices
 
+    to_attach = {}
     for front_vm in vm.app.domains:
         if not front_vm.is_running():
             continue
-        for assignment in front_vm.devices[devclass].assignments(
-                persistent=True):
-            if (assignment.backend_domain == vm
-                    and assignment.port_id in added
-                    and assignment.port_id not in attached
-            ):
-                asyncio.ensure_future(ext.attach_and_notify(
-                    front_vm, assignment.device, assignment.options))
+        for assignment in front_vm.devices[devclass].get_assigned_devices():
+            for device in assignment.devices:
+                if (assignment.matches(device)
+                        and device.port_id in added
+                        and device.port_id not in attached
+                ):
+                    frontends = to_attach.get(device.port_id, {})
+                    # make it unique
+                    frontends[front_vm] = assignment.clone(
+                        device=VirtualDevice(device.port, device.device_id))
+                    to_attach[device.port_id] = frontends
+
+    for port_id, frontends in to_attach.items():
+        if len(frontends) > 1:
+            # unique
+            device = tuple(frontends.values())[0].devices[0]
+            target_name = confirm_device_attachment(device, frontends)
+            for front in frontends:
+                if front.name == target_name:
+                    target = front
+                    assignment = frontends[front]
+                    # already asked
+                    if assignment.mode.value == "ask-to-attach":
+                        assignment.mode = device_protocol.AssignmentMode.AUTO
+                    break
+            else:
+                return
+        else:
+            target = tuple(frontends.keys())[0]
+            assignment = frontends[target]
+
+        asyncio.ensure_future(ext.attach_and_notify(target, assignment))
 
 
 def compare_device_cache(vm, devices_cache, current_devices):
@@ -101,3 +132,17 @@ def compare_device_cache(vm, devices_cache, current_devices):
             if cached_front is not None:
                 detached[dev_id] = cached_front
     return added, attached, detached, removed
+
+
+def confirm_device_attachment(device, frontends) -> str:
+    guivm = 'dom0'  # TODO
+    # TODO: guivm rpc?
+
+    proc = subprocess.Popen(
+        ["attach-confirm", guivm,
+         device.backend_domain.name, device.port_id,
+         device.description,
+         *[f.name for f in frontends.keys()]],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (target_name, _) = proc.communicate()
+    return target_name.decode()
