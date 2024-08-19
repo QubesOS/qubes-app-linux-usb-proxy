@@ -23,6 +23,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 import collections
+import dataclasses
 import fcntl
 import grp
 import os
@@ -32,11 +33,12 @@ import subprocess
 import sys
 
 import tempfile
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Any
 
 try:
     from qubes.device_protocol import DeviceInfo
     from qubes.device_protocol import DeviceInterface
+    from qubes.device_protocol import Port
     from qubes.ext import utils
     from qubes.devices import UnrecognizedDevice
 
@@ -72,6 +74,12 @@ except ImportError:
         def frontend_domain(self):
             return self.attachment
 
+    @dataclasses.dataclass
+    class Port:
+        backend_domain: Any
+        port_id: Any
+        devclass: Any
+
     class DeviceInterface:
         pass
 
@@ -100,7 +108,7 @@ class USBDevice(DeviceInfo):
         # the superclass can restrict the allowed characters
         self.safe_chars = (string.ascii_letters + string.digits
                            + string.punctuation + ' ')
-        port = qubes.device_protocol.Port(
+        port = Port(
             backend_domain=backend_domain, port_id=port_id, devclass="usb")
         super(USBDevice, self).__init__(port)
 
@@ -558,6 +566,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running():
             return
+
+        print(port_id, file=sys.stderr)
         if vm.untrusted_qdb.list(
                         '/qubes-usb-devices/' + port_id.replace('.', '_')):
             yield USBDevice(vm, port_id)
