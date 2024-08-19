@@ -512,7 +512,6 @@ class USBDeviceExtension(qubes.ext.Extension):
 
     async def attach_and_notify(self, vm, assignment):
         # bypass DeviceCollection logic preventing double attach
-        identity = assignment.device_id
         for device in assignment.devices:
             if not assignment.matches(device):
                 print(
@@ -567,7 +566,6 @@ class USBDeviceExtension(qubes.ext.Extension):
         if not vm.is_running():
             return
 
-        print(port_id, file=sys.stderr)
         if vm.untrusted_qdb.list(
                         '/qubes-usb-devices/' + port_id.replace('.', '_')):
             yield USBDevice(vm, port_id)
@@ -676,14 +674,14 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         # update the cache before the call, to avoid sending duplicated events
         # (one on qubesdb watch and the other by the caller of this method)
-        backend = attached
-        self.devices_cache[backend][attached.port_id] = None
+        backend = attached.backend_domain
+        self.devices_cache[backend.name][attached.port_id] = None
 
         try:
-            await backend.backend_domain.run_service_for_stdio(
+            await backend.run_service_for_stdio(
                 'qubes.USBDetach',
                 user='root',
-                input='{}\n'.format(backend.port_id).encode())
+                input='{}\n'.format(attached.port_id).encode())
         except subprocess.CalledProcessError as e:
             # TODO: sanitize and include stdout
             raise QubesUSBException('Device detach failed')
