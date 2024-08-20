@@ -523,10 +523,13 @@ class USBDeviceExtension(qubes.ext.Extension):
                         device, {vm: assignment}):
                     return
 
-            await self.on_device_attach_usb(
-                vm, 'device-pre-attach:usb', device, assignment.options)
-            await vm.fire_event_async(
-                'device-attach:usb', device=device, options=assignment.options)
+            try:
+                await self.on_device_attach_usb(
+                    vm, 'device-pre-attach:usb', device, assignment.options)
+                await vm.fire_event_async(
+                    'device-attach:usb', device=device, options=assignment.options)
+            except qubes.devices.DeviceAlreadyAttached:
+                pass
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
@@ -689,7 +692,9 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
-        for assignment in get_assigned_devices(vm.devices['usb']):
+        # the most specific assignments first
+        for assignment in reversed(sorted(
+                get_assigned_devices(vm.devices['usb']))):
             await self.attach_and_notify(vm, assignment)
 
     @qubes.ext.handler('domain-shutdown')
