@@ -512,24 +512,14 @@ class USBDeviceExtension(qubes.ext.Extension):
 
     async def attach_and_notify(self, vm, assignment):
         # bypass DeviceCollection logic preventing double attach
-        for device in assignment.devices:
-            if not assignment.matches(device):
-                print(
-                    "Unrecognized identity, skipping attachment of device "
-                    f"from the port {assignment}", file=sys.stderr)
-                continue
-            if assignment.mode.value == "ask-to-attach":
-                if vm.name != utils.confirm_device_attachment(
-                        device, {vm: assignment}):
-                    return
-
-            try:
-                await self.on_device_attach_usb(
-                    vm, 'device-pre-attach:usb', device, assignment.options)
-                await vm.fire_event_async(
-                    'device-attach:usb', device=device, options=assignment.options)
-            except qubes.devices.DeviceAlreadyAttached:
-                pass
+        device = assignment.device
+        if assignment.mode.value == "ask-to-attach":
+            if vm.name != utils.confirm_device_attachment(device, {vm: assignment}):
+                return
+        await self.on_device_attach_usb(
+            vm, 'device-pre-attach:usb', device, assignment.options)
+        await vm.fire_event_async(
+            'device-attach:usb', device=device, options=assignment.options)
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
@@ -692,9 +682,21 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
+        to_attach = {}
+        assignments = get_assigned_devices(vm.devices['usb'])
         # the most specific assignments first
-        for assignment in reversed(sorted(
-                get_assigned_devices(vm.devices['usb']))):
+        for assignment in reversed(sorted(assignments)):
+            for device in assignment.devices:
+                if not assignment.matches(device):
+                    print(
+                        "Unrecognized identity, skipping attachment of device "
+                        f"from the port {assignment}", file=sys.stderr)
+                    continue
+                # chose first assignment (the most specific) and ignore rest
+                if device not in to_attach:
+                    # make it unique
+                    to_attach[device] = assignment.clone(device=device)
+        for assignment in to_attach.values():
             await self.attach_and_notify(vm, assignment)
 
     @qubes.ext.handler('domain-shutdown')
