@@ -256,7 +256,7 @@ class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
                          "Device connection failed")
 
         usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertEquals(usb_list[self.usbdev_name]['connected-to'],
+        self.assertEqual(usb_list[self.usbdev_name]['connected-to'],
                           self.frontend)
 
     def test_030_detach(self):
@@ -320,13 +320,13 @@ class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
                          "Device connection failed")
 
         usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertEquals(usb_list[self.usbdev_name]['connected-to'],
+        self.assertEqual(usb_list[self.usbdev_name]['connected-to'],
                           self.frontend)
 
         usb_list_front_post = qubes.qubesutils.usb_list(self.qc,
                                                         vm=self.frontend)
 
-        self.assertEquals(usb_list_front_pre, usb_list_front_post)
+        self.assertEqual(usb_list_front_pre, usb_list_front_post)
 
     def test_060_auto_detach_on_remove(self):
         self.frontend.start()
@@ -433,7 +433,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                            wait=True), 0,
                          "Device connection failed")
 
-        self.assertEquals(usb_dev.attachment, self.frontend)
+        self.assertEqual(usb_dev.attachment, self.frontend)
 
     def test_030_detach(self):
         self.frontend.start()
@@ -483,11 +483,11 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                                            wait=True), 0,
                          "Device connection failed")
 
-        self.assertEquals(usb_list[self.usbdev_ident].attachment, self.frontend)
+        self.assertEqual(usb_list[self.usbdev_ident].attachment, self.frontend)
 
         usb_list_front_post = list(self.frontend.devices['usb'])
 
-        self.assertEquals(usb_list_front_pre, usb_list_front_post)
+        self.assertEqual(usb_list_front_pre, usb_list_front_post)
 
     def test_060_auto_detach_on_remove(self):
         self.frontend.start()
