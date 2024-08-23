@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
+import asyncio
 import collections
 import dataclasses
 import fcntl
@@ -514,7 +514,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         # bypass DeviceCollection logic preventing double attach
         device = assignment.device
         if assignment.mode.value == "ask-to-attach":
-            if vm.name != utils.confirm_device_attachment(device, {vm: assignment}):
+            if vm.name != utils.confirm_device_attachment(
+                    device, {vm: assignment}):
                 return
         await self.on_device_attach_usb(
             vm, 'device-pre-attach:usb', device, assignment.options)
@@ -687,6 +688,10 @@ class USBDeviceExtension(qubes.ext.Extension):
         # the most specific assignments first
         for assignment in reversed(sorted(assignments)):
             for device in assignment.devices:
+                if isinstance(device, qubes.device_protocol.UnknownDevice):
+                    continue
+                if device.attachment:
+                    continue
                 if not assignment.matches(device):
                     print(
                         "Unrecognized identity, skipping attachment of device "
@@ -697,7 +702,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                     # make it unique
                     to_attach[device] = assignment.clone(device=device)
         for assignment in to_attach.values():
-            await self.attach_and_notify(vm, assignment)
+            asyncio.ensure_future(self.attach_and_notify(vm, assignment))
 
     @qubes.ext.handler('domain-shutdown')
     async def on_domain_shutdown(self, vm, _event, **_kwargs):
