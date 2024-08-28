@@ -45,6 +45,8 @@ else:
         entry_points={
             'qubes.tests.extra.for_template':
                 'usbproxy = qubesusbproxy.tests:list_tests',
+            'qubes.tests.extra':
+                'usbproxy = qubesusbproxy.tests:list_unit_tests',
             'qubes.ext':
                 'usbproxy = qubesusbproxy.core3ext:USBDeviceExtension',
             'qubes.devices':

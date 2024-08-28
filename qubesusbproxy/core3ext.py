@@ -21,8 +21,9 @@
 # You should have received a copy of the GNU General Public License along
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
+import asyncio
 import collections
+import dataclasses
 import fcntl
 import grp
 import os
@@ -32,11 +33,12 @@ import subprocess
 import sys
 
 import tempfile
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Any
 
 try:
     from qubes.device_protocol import DeviceInfo
     from qubes.device_protocol import DeviceInterface
+    from qubes.device_protocol import Port
     from qubes.ext import utils
     from qubes.devices import UnrecognizedDevice
 
@@ -54,11 +56,10 @@ except ImportError:
             return self.name
 
     class DeviceInfo(DescriptionOverrider, LegacyDeviceInfo):
-        def __init__(self, *args, **kwargs):
+        def __init__(self, port):
             # not supported options in legacy code
-            del kwargs['devclass']
             self.safe_chars = self.safe_chars.replace(' ', '')
-            super().__init__(*args, **kwargs)
+            super().__init__(port.backend_domain, port.port_id)
 
             # needed but not in legacy DeviceInfo
             self._vendor = None
@@ -72,6 +73,12 @@ except ImportError:
         @property
         def frontend_domain(self):
             return self.attachment
+
+    @dataclasses.dataclass
+    class Port:
+        backend_domain: Any
+        port_id: Any
+        devclass: Any
 
     class DeviceInterface:
         pass
@@ -97,14 +104,15 @@ HWDATA_PATH = '/usr/share/hwdata'
 
 class USBDevice(DeviceInfo):
     # pylint: disable=too-few-public-methods
-    def __init__(self, backend_domain, ident):
+    def __init__(self, backend_domain, port_id):
         # the superclass can restrict the allowed characters
         self.safe_chars = (string.ascii_letters + string.digits
                            + string.punctuation + ' ')
-        super(USBDevice, self).__init__(
-            backend_domain=backend_domain, ident=ident, devclass="usb")
+        port = Port(
+            backend_domain=backend_domain, port_id=port_id, devclass="usb")
+        super(USBDevice, self).__init__(port)
 
-        self._qdb_ident = ident.replace('.', '_')
+        self._qdb_ident = port_id.replace('.', '_')
         self._qdb_path = '/qubes-usb-devices/' + self._qdb_ident
         self._vendor_id = None
         self._product_id = None
@@ -326,7 +334,7 @@ class USBDevice(DeviceInfo):
         if not usb_connected_to_re.match(untrusted_connected_to):
             self.backend_domain.log.warning(
                 'Device {} has invalid chars in connected-to '
-                'property'.format(self.ident))
+                'property'.format(self.port_id))
             return None
         untrusted_connected_to = untrusted_connected_to.decode(
             'ascii', errors='strict')
@@ -335,13 +343,13 @@ class USBDevice(DeviceInfo):
                 untrusted_connected_to]
         except KeyError:
             self.backend_domain.log.warning(
-                f'Device {self.ident} has invalid VM name in connected-to '
+                f'Device {self.port_id} has invalid VM name in connected-to '
                 f'property: {untrusted_connected_to}')
             return None
         return connected_to
 
     @property
-    def self_identity(self) -> str:
+    def device_id(self) -> str:
         """
         Get identification of a device not related to port.
         """
@@ -495,28 +503,30 @@ class USBDeviceExtension(qubes.ext.Extension):
             # avoid building a cache on domain-init, as it isn't fully set yet,
             # and definitely isn't running yet
             current_devices = {
-                dev.ident: dev.attachment
+                dev.port_id: dev.attachment
                 for dev in self.on_device_list_usb(vm, None)
             }
             self.devices_cache[vm.name] = current_devices
         else:
             self.devices_cache[vm.name] = {}
 
-    async def attach_and_notify(self, vm, device, options):
+    async def attach_and_notify(self, vm, assignment):
         # bypass DeviceCollection logic preventing double attach
-        try:
-            await self.on_device_attach_usb(
-                vm, 'device-pre-attach:usb', device, options)
-        except UnrecognizedDevice:
-            return
+        device = assignment.device
+        if assignment.mode.value == "ask-to-attach":
+            if vm.name != utils.confirm_device_attachment(
+                    device, {vm: assignment}):
+                return
+        await self.on_device_attach_usb(
+            vm, 'device-pre-attach:usb', device, assignment.options)
         await vm.fire_event_async(
-            'device-attach:usb', device=device, options=options)
+            'device-attach:usb', device=device, options=assignment.options)
 
     @qubes.ext.handler('domain-qdb-change:/qubes-usb-devices')
     def on_qdb_change(self, vm, event, path):
         """A change in QubesDB means a change in a device list."""
         # pylint: disable=unused-argument,no-self-use
-        current_devices = dict((dev.ident, dev.attachment)
+        current_devices = dict((dev.port_id, dev.attachment)
                                for dev in self.on_device_list_usb(vm, None))
         utils.device_list_change(self, current_devices, vm, path, USBDevice)
 
@@ -541,17 +551,18 @@ class USBDeviceExtension(qubes.ext.Extension):
             if not usb_device_re.match(untrusted_qdb_ident):
                 vm.log.warning('Invalid USB device name detected')
                 continue
-            ident = untrusted_qdb_ident.replace('_', '.')
-            yield USBDevice(vm, ident)
+            port_id = untrusted_qdb_ident.replace('_', '.')
+            yield USBDevice(vm, port_id)
 
     @qubes.ext.handler('device-get:usb')
-    def on_device_get_usb(self, vm, event, ident):
+    def on_device_get_usb(self, vm, event, port_id):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running():
             return
+
         if vm.untrusted_qdb.list(
-                        '/qubes-usb-devices/' + ident.replace('.', '_')):
-            yield USBDevice(vm, ident)
+                        '/qubes-usb-devices/' + port_id.replace('.', '_')):
+            yield USBDevice(vm, port_id)
 
     @staticmethod
     def get_all_devices(app):
@@ -572,25 +583,15 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         for dev in self.get_all_devices(vm.app):
             if dev.attachment == vm:
-                yield (dev, {'identity': dev.self_identity})
+                yield (dev, {})
 
     @qubes.ext.handler('device-pre-attach:usb')
     async def on_device_attach_usb(self, vm, event, device, options):
         # pylint: disable=unused-argument
 
         if options:
-            if list(options.keys()) != ['identity']:
-                raise qubes.exc.QubesException(
-                    'USB device attach do not support user options')
-            identity = options['identity']
-            if identity != 'any' and device.self_identity != identity:
-                print(f"Unrecognized identity, skipping attachment of {device}",
-                      file=sys.stderr)
-                raise UnrecognizedDevice(
-                    "Device presented identity "
-                    f"{device.self_identity} "
-                    f"does not match expected {identity}"
-                )
+            raise qubes.exc.QubesException(
+                'USB device attach do not support user options')
 
         if not vm.is_running() or vm.qid == 0:
             # print(f"Qube is not running, skipping attachment of {device}",
@@ -621,12 +622,12 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         # update the cache before the call, to avoid sending duplicated events
         # (one on qubesdb watch and the other by the caller of this method)
-        self.devices_cache[device.backend_domain.name][device.ident] = vm
+        self.devices_cache[device.backend_domain.name][device.port_id] = vm
 
         # set qrexec policy to allow this device
         policy_line = '{} {} allow,user=root\n'.format(name,
             device.backend_domain.name)
-        modify_qrexec_policy('qubes.USB+{}'.format(device.ident),
+        modify_qrexec_policy('qubes.USB+{}'.format(device.port_id),
             policy_line, True)
         try:
             # and actual attach
@@ -634,7 +635,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 await vm.run_service_for_stdio('qubes.USBAttach',
                     user='root',
                     input='{} {}\n'.format(device.backend_domain.name,
-                        device.ident).encode(), **extra_kwargs)
+                        device.port_id).encode(), **extra_kwargs)
             except subprocess.CalledProcessError as e:
                 if e.returncode == 127:
                     raise USBProxyNotInstalled(
@@ -646,34 +647,32 @@ class USBDeviceExtension(qubes.ext.Extension):
                     raise QubesUSBException(
                         'Device attach failed: {}'.format(sanitized_stderr))
         finally:
-            modify_qrexec_policy('qubes.USB+{}'.format(device.ident),
+            modify_qrexec_policy('qubes.USB+{}'.format(device.port_id),
                 policy_line, False)
 
     @qubes.ext.handler('device-pre-detach:usb')
-    async def on_device_detach_usb(self, vm, event, device):
+    async def on_device_detach_usb(self, vm, event, port):
         # pylint: disable=unused-argument,no-self-use
         if not vm.is_running() or vm.qid == 0:
             return
 
-        if not isinstance(device, USBDevice):
-            return
-
-        connected_to = device.attachment
-        # detect race conditions; there is still race here, but much smaller
-        if connected_to is None or connected_to.qid != vm.qid:
+        for attached, options in self.on_device_list_attached(vm, event):
+            if attached.port == port:
+                break
+        else:
             raise QubesUSBException(
-                "Device {!s} not connected to VM {}".format(
-                    device, vm.name))
+                f"Device {port} not connected to VM {vm.name}")
 
         # update the cache before the call, to avoid sending duplicated events
         # (one on qubesdb watch and the other by the caller of this method)
-        self.devices_cache[device.backend_domain.name][device.ident] = None
+        backend = attached.backend_domain
+        self.devices_cache[backend.name][attached.port_id] = None
 
         try:
-            await device.backend_domain.run_service_for_stdio(
+            await backend.run_service_for_stdio(
                 'qubes.USBDetach',
                 user='root',
-                input='{}\n'.format(device.ident).encode())
+                input='{}\n'.format(attached.port_id).encode())
         except subprocess.CalledProcessError as e:
             # TODO: sanitize and include stdout
             raise QubesUSBException('Device detach failed')
@@ -681,9 +680,26 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
-        for assignment in get_assigned_devices(vm.devices['usb']):
-            await self.attach_and_notify(
-                vm, assignment.device, assignment.options)
+        to_attach = {}
+        assignments = get_assigned_devices(vm.devices['usb'])
+        # the most specific assignments first
+        for assignment in reversed(sorted(assignments)):
+            for device in assignment.devices:
+                if isinstance(device, qubes.device_protocol.UnknownDevice):
+                    continue
+                if device.attachment:
+                    continue
+                if not assignment.matches(device):
+                    print(
+                        "Unrecognized identity, skipping attachment of device "
+                        f"from the port {assignment}", file=sys.stderr)
+                    continue
+                # chose first assignment (the most specific) and ignore rest
+                if device not in to_attach:
+                    # make it unique
+                    to_attach[device] = assignment.clone(device=device)
+        for assignment in to_attach.values():
+            asyncio.ensure_future(self.attach_and_notify(vm, assignment))
 
     @qubes.ext.handler('domain-shutdown')
     async def on_domain_shutdown(self, vm, _event, **_kwargs):
