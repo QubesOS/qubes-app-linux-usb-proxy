@@ -641,8 +641,11 @@ class USBDeviceExtension(qubes.ext.Extension):
                         "qubes-usb-proxy not installed in the VM")
                 else:
                     # TODO: sanitize and include stdout
+                    sanitized_stderr = e.stderr.replace(b"\n", b", ")
                     sanitized_stderr = ''.join(
-                        [chr(c) for c in e.stderr if 0x20 <= c < 0x80])
+                        [chr(c) for c in sanitized_stderr if 0x20 <= c < 0x80])
+                    if sanitized_stderr.endswith(", "):
+                        sanitized_stderr = santizied_stderr[:-2] + "."
                     raise QubesUSBException(
                         'Device attach failed: {}'.format(sanitized_stderr))
         finally:
