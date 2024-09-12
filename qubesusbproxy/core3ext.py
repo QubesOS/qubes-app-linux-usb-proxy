@@ -88,6 +88,7 @@ import qubes.ext
 import qubes.vm.adminvm
 
 usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
+usb_device_qname_re = re.compile(r"^0x\w{4}_0x\w{4}$")
 # should match valid VM name
 usb_connected_to_re = re.compile(br"^[a-zA-Z][a-zA-Z0-9_.-]*$")
 usb_device_hw_ident_re = re.compile(r'^[0-9a-f]{4}:[0-9a-f]{4} ')
@@ -538,7 +539,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         untrusted_dev_list = \
             set(path.split('/')[2] for path in untrusted_dev_list)
         for untrusted_qdb_ident in untrusted_dev_list:
-            if not usb_device_re.match(untrusted_qdb_ident):
+            if (not usb_device_re.match(untrusted_qdb_ident) and
+                not usb_device_qname_re.match(untrusted_qdb_ident)):
                 vm.log.warning('Invalid USB device name detected')
                 continue
             ident = untrusted_qdb_ident.replace('_', '.')
