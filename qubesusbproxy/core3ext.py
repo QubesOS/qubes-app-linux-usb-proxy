@@ -591,7 +591,7 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         if options:
             raise qubes.exc.QubesException(
-                'USB device attach do not support user options')
+                'USB device attach does not support user options')
 
         if not vm.is_running() or vm.qid == 0:
             # print(f"Qube is not running, skipping attachment of {device}",
