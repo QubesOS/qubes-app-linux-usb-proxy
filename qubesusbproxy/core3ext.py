@@ -514,8 +514,10 @@ class USBDeviceExtension(qubes.ext.Extension):
         # bypass DeviceCollection logic preventing double attach
         device = assignment.device
         if assignment.mode.value == "ask-to-attach":
-            if vm.name != utils.confirm_device_attachment(
-                    device, {vm: assignment}):
+            allowed = await utils.confirm_device_attachment(
+                device, {vm: assignment})
+            allowed = allowed.strip()
+            if vm.name != allowed:
                 return
         await self.on_device_attach_usb(
             vm, 'device-pre-attach:usb', device, assignment.options)
