@@ -682,6 +682,14 @@ class USBDeviceExtension(qubes.ext.Extension):
             # TODO: sanitize and include stdout
             raise QubesUSBException('Device detach failed')
 
+    @qubes.ext.handler('device-pre-assign:usb')
+    async def on_device_assign_usb(self, vm, event, device, options):
+        # pylint: disable=unused-argument
+
+        if options:
+            raise qubes.exc.QubesException(
+                'USB device assignment does not support user options')
+
     @qubes.ext.handler('domain-start')
     async def on_domain_start(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
