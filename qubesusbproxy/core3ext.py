@@ -711,8 +711,12 @@ class USBDeviceExtension(qubes.ext.Extension):
                 if device not in to_attach:
                     # make it unique
                     to_attach[device] = assignment.clone(device=device)
+        in_progress = set()
         for assignment in to_attach.values():
-            asyncio.ensure_future(self.attach_and_notify(vm, assignment))
+            in_progress.add(
+                asyncio.ensure_future(self.attach_and_notify(vm, assignment)))
+        if in_progress:
+            await asyncio.wait(in_progress)
 
     @qubes.ext.handler('domain-shutdown')
     async def on_domain_shutdown(self, vm, _event, **_kwargs):

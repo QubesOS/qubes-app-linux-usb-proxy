@@ -23,7 +23,7 @@
 #
 import unittest
 from unittest import mock
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 import jinja2
 
@@ -40,10 +40,10 @@ try:
     try:
         from qubes.device_protocol import DeviceAssignment, VirtualDevice, Port
 
-        def make_assignment(backend, ident, required=False):
+        def make_assignment(backend, ident, auto_attach=False):
             return DeviceAssignment(VirtualDevice(Port(
                 backend, ident, 'usb')),
-                mode='required' if required else 'manual')
+                mode='auto-attach' if auto_attach else 'manual')
 
         def assign(test, collection, assignment):
             test.loop.run_until_complete(collection.assign(assignment))
@@ -401,7 +401,8 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
         self.qrexec_policy('qubes.USB', self.frontend.name, self.backend.name)
         self.usbdev_ident = create_usb_gadget(self.backend).decode()
         self.usbdev_name = '{}:{}:{}'.format(
-            self.backend.name, self.usbdev_ident, "0000:0000::?******")
+            self.backend.name, self.usbdev_ident,
+            "1234:1234:0123456789:u080650")
 
     def tearDown(self):
         # remove vms in this specific order, otherwise there may remain stray
@@ -416,9 +417,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
     def test_010_assign(self):
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = DeviceAssignment(VirtualDevice(Port(
-                self.backend, self.usbdev_ident, 'usb')),
-                mode='ask-to-attach')
+        ass = make_assignment(self.backend, self.usbdev_ident, auto_attach=True)
         assign(self, self.frontend.devices['usb'], ass)
         self.assertIsNone(usb_dev.attachment)
         try:
@@ -432,10 +431,14 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
         self.assertEqual(usb_dev.attachment, self.frontend)
 
+    @unittest.mock.patch('qubes.ext.utils.confirm_device_attachment')
     @unittest.skipIf(LEGACY, "new feature")
-    def test_011_assign_ask(self):
+    def test_011_assign_ask(self, confirm):
+        confirm.return_value = self.frontend.name
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = make_assignment(self.backend, self.usbdev_ident, required=True)
+        ass = DeviceAssignment(VirtualDevice(Port(
+            self.backend, self.usbdev_ident, 'usb')),
+            mode='ask-to-attach')
         assign(self, self.frontend.devices['usb'], ass)
         self.assertIsNone(usb_dev.attachment)
         try:
@@ -488,7 +491,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
 
     def test_040_unassign(self):
         usb_dev = self.backend.devices['usb'][self.usbdev_ident]
-        ass = make_assignment(self.backend, self.usbdev_ident, required=True)
+        ass = make_assignment(self.backend, self.usbdev_ident, auto_attach=True)
         assign(self, self.frontend.devices['usb'], ass)
         self.assertIsNone(usb_dev.attachment)
         unassign(self, self.frontend.devices['usb'], ass)
@@ -540,7 +543,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
     def test_061_auto_attach_on_reconnect(self):
         self.frontend.start()
         usb_list = self.backend.devices['usb']
-        ass = make_assignment(self.backend, self.usbdev_ident, required=True)
+        ass = make_assignment(self.backend, self.usbdev_ident, auto_attach=True)
         try:
             assign(self, self.frontend.devices['usb'], ass)
         except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
@@ -568,7 +571,7 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
     def test_062_ask_to_attach_on_start(self):
         self.frontend.start()
         usb_list = self.backend.devices['usb']
-        ass = make_assignment(self.backend, self.usbdev_ident, required=True)
+        ass = make_assignment(self.backend, self.usbdev_ident, auto_attach=True)
         try:
             assign(self, self.frontend.devices['usb'], ass)
         except qubesusbproxy.core3ext.USBProxyNotInstalled as e:
@@ -855,8 +858,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'any': 'did'})
 
-    @unittest.mock.patch('subprocess.Popen')
-    def test_013_on_qdb_change_two_fronts_failed(self, mock_confirm):
+    # replace async function with sync one
+    @unittest.mock.patch('qubes.ext.utils.confirm_device_attachment',
+                         new_callable=Mock)
+    def test_013_on_qdb_change_two_fronts_failed(self, _confirm):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, '1-1')
@@ -866,18 +871,22 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices['usb']._assigned.append(assign)
         back.devices['usb']._exposed.append(exp_dev)
 
-        proc = Mock()
-        proc.communicate = Mock()
-        proc.communicate.return_value = (b'nonsense', b'')
-        mock_confirm.return_value = proc
+        class quick_mock:
+            @staticmethod
+            def result():
+                return "nonsense"
+
         self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
+        with mock.patch('asyncio.ensure_future') as future:
+            future.return_value = quick_mock
             self.ext.on_qdb_change(back, None, None)
-        proc.communicate.assert_called_once()
+
         self.ext.attach_and_notify.assert_not_called()
 
-    @unittest.mock.patch('subprocess.Popen')
-    def test_014_on_qdb_change_two_fronts(self, mock_confirm):
+    # replace async function with sync one
+    @unittest.mock.patch('qubes.ext.utils.confirm_device_attachment',
+                         new_callable=Mock)
+    def test_014_on_qdb_change_two_fronts(self, _confirm):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, '1-1')
@@ -887,16 +896,17 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices['usb']._assigned.append(assign)
         back.devices['usb']._exposed.append(exp_dev)
 
-        proc = Mock()
-        proc.communicate = Mock()
-        proc.communicate.return_value = (b'front-vm', b'')
-        mock_confirm.return_value = proc
+        class quick_mock:
+            @staticmethod
+            def result():
+                return "front-vm"
+
         self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
+        with mock.patch('asyncio.ensure_future') as future:
+            future.return_value = quick_mock
             self.ext.on_qdb_change(back, None, None)
-        proc.communicate.assert_called_once()
-        self.ext.attach_and_notify.assert_called_once_with(
-            front, assign)
+
+        self.ext.attach_and_notify.assert_called_once_with(front, assign)
         # don't ask again
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].mode.value,
                          'auto-attach')
@@ -915,6 +925,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             self.ext.on_qdb_change(back, None, None)
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].mode.value,
                          'ask-to-attach')
+
     def test_020_on_startup_multiple_assignments_including_full(self):
         back, front = self.added_assign_setup()
 
@@ -936,10 +947,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices['usb']._exposed.append(
             qubesusbproxy.core3ext.USBDevice(back, '1-1'))
 
-        self.ext.attach_and_notify = Mock()
+        self.ext.attach_and_notify = AsyncMock()
         loop = asyncio.get_event_loop()
-        with mock.patch('asyncio.ensure_future'):
-            loop.run_until_complete(self.ext.on_domain_start(front, None))
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'pid': 'did'})
 
@@ -961,9 +971,8 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(back, '1-1'))
 
         loop = asyncio.get_event_loop()
-        self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
-            loop.run_until_complete(self.ext.on_domain_start(front, None))
+        self.ext.attach_and_notify = AsyncMock()
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'pid': 'any'})
 
@@ -986,10 +995,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices['usb']._exposed.append(
             qubesusbproxy.core3ext.USBDevice(back, '1-2'))
 
-        self.ext.attach_and_notify = Mock()
+        self.ext.attach_and_notify = AsyncMock()
         loop = asyncio.get_event_loop()
-        with mock.patch('asyncio.ensure_future'):
-            loop.run_until_complete(self.ext.on_domain_start(front, None))
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'any': 'did'})
 
@@ -1001,7 +1009,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             exp_dev.port, exp_dev.device_id), mode='auto-attach')
 
         front.devices['usb']._assigned.append(assign)
-        attached_device = back.devices['usb']._exposed.append(exp_dev)
+        back.devices['usb']._exposed.append(exp_dev)
 
         self.ext.attach_and_notify = Mock()
         loop = asyncio.get_event_loop()
