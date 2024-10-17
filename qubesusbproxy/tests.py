@@ -805,8 +805,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(back, '1-1'))
 
         self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
-            self.ext.on_qdb_change(back, None, None)
+        loop = asyncio.get_event_loop()
+        with mock.patch('asyncio.wait'):
+            with mock.patch('asyncio.ensure_future'):
+                loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'pid': 'did'})
 
@@ -828,8 +830,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(back, '1-1'))
 
         self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
-            self.ext.on_qdb_change(back, None, None)
+        loop = asyncio.get_event_loop()
+        with mock.patch('asyncio.wait'):
+            with mock.patch('asyncio.ensure_future'):
+                loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'pid': 'any'})
 
@@ -853,15 +857,14 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(back, '1-2'))
 
         self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
-            self.ext.on_qdb_change(back, None, None)
+        loop = asyncio.get_event_loop()
+        with mock.patch('asyncio.wait'):
+            with mock.patch('asyncio.ensure_future'):
+                loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(self.ext.attach_and_notify.call_args[0][1].options,
                          {'any': 'did'})
 
-    # replace async function with sync one
-    @unittest.mock.patch('qubes.ext.utils.confirm_device_attachment',
-                         new_callable=Mock)
-    def test_013_on_qdb_change_two_fronts_failed(self, _confirm):
+    def test_013_on_qdb_change_two_fronts(self):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, '1-1')
@@ -871,47 +874,58 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices['usb']._assigned.append(assign)
         back.devices['usb']._exposed.append(exp_dev)
 
-        class quick_mock:
-            @staticmethod
-            def result():
-                return "nonsense"
+        resolver_path = 'qubes.ext.utils.resolve_conflicts_and_attach'
+        with mock.patch(resolver_path, new_callable=Mock) as resolver:
+            with mock.patch('asyncio.ensure_future'):
+                self.ext.on_qdb_change(back, None, None)
+            resolver.assert_called_once_with(
+                self.ext, {'1-1': {front: assign, back: assign}})
 
-        self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future') as future:
-            future.return_value = quick_mock
-            self.ext.on_qdb_change(back, None, None)
-
-        self.ext.attach_and_notify.assert_not_called()
-
-    # replace async function with sync one
-    @unittest.mock.patch('qubes.ext.utils.confirm_device_attachment',
-                         new_callable=Mock)
-    def test_014_on_qdb_change_two_fronts(self, _confirm):
+    @unittest.mock.patch('asyncio.create_subprocess_shell')
+    def test_014_failed_confirmation(self, shell):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, '1-1')
-        assign = DeviceAssignment(exp_dev, mode='ask-to-attach')
+        assign = DeviceAssignment(exp_dev, mode='auto-attach')
 
         front.devices['usb']._assigned.append(assign)
         back.devices['usb']._assigned.append(assign)
         back.devices['usb']._exposed.append(exp_dev)
 
-        class quick_mock:
-            @staticmethod
-            def result():
-                return "front-vm"
+        proc = AsyncMock()
+        shell.return_value = proc
+        proc.communicate = AsyncMock()
+        proc.communicate.return_value = (b'nonsense', b'')
 
-        self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future') as future:
-            future.return_value = quick_mock
-            self.ext.on_qdb_change(back, None, None)
+        loop = asyncio.get_event_loop()
+        self.ext.attach_and_notify = AsyncMock()
+        loop.run_until_complete(qubes.ext.utils.resolve_conflicts_and_attach(
+            self.ext, {'1-1': {front: assign, back: assign}}))
+        self.ext.attach_and_notify.assert_not_called()
 
+    @unittest.mock.patch('asyncio.create_subprocess_shell')
+    def test_015_successful_confirmation(self, shell):
+        back, front = self.added_assign_setup()
+
+        exp_dev = qubesusbproxy.core3ext.USBDevice(back, '1-1')
+        assign = DeviceAssignment(exp_dev, mode='auto-attach')
+
+        front.devices['usb']._assigned.append(assign)
+        back.devices['usb']._assigned.append(assign)
+        back.devices['usb']._exposed.append(exp_dev)
+
+        proc = AsyncMock()
+        shell.return_value = proc
+        proc.communicate = AsyncMock()
+        proc.communicate.return_value = (b'front-vm', b'')
+
+        loop = asyncio.get_event_loop()
+        self.ext.attach_and_notify = AsyncMock()
+        loop.run_until_complete(qubes.ext.utils.resolve_conflicts_and_attach(
+            self.ext, {'1-1': {front: assign, back: assign}}))
         self.ext.attach_and_notify.assert_called_once_with(front, assign)
-        # don't ask again
-        self.assertEqual(self.ext.attach_and_notify.call_args[0][1].mode.value,
-                         'auto-attach')
 
-    def test_015_on_qdb_change_ask(self):
+    def test_016_on_qdb_change_ask(self):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, '1-1')
@@ -920,11 +934,12 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices['usb']._assigned.append(assign)
         back.devices['usb']._exposed.append(exp_dev)
 
-        self.ext.attach_and_notify = Mock()
-        with mock.patch('asyncio.ensure_future'):
-            self.ext.on_qdb_change(back, None, None)
-        self.assertEqual(self.ext.attach_and_notify.call_args[0][1].mode.value,
-                         'ask-to-attach')
+        resolver_path = 'qubes.ext.utils.resolve_conflicts_and_attach'
+        with mock.patch(resolver_path, new_callable=Mock) as resolver:
+            with mock.patch('asyncio.ensure_future'):
+                self.ext.on_qdb_change(back, None, None)
+            resolver.assert_called_once_with(
+                self.ext, {'1-1': {front: assign}})
 
     def test_020_on_startup_multiple_assignments_including_full(self):
         back, front = self.added_assign_setup()
