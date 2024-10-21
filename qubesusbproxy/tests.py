@@ -808,6 +808,8 @@ class TestVM(qubes.tests.TestEmitter):
     def __init__(self, qdb, running=True, name="test-vm", **kwargs):
         super().__init__(**kwargs)
         self.name = name
+        self.klass = "AdminVM" if name == "dom0" else "AppVM"
+        self.icon = "red"
         self.untrusted_qdb = TestQubesDB(qdb)
         self.libvirt_domain = mock.Mock()
         self.features = mock.Mock()
@@ -859,6 +861,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back_vm.app.domains["sys-usb"] = back_vm
         back_vm.app.domains["front-vm"] = front
         back_vm.app.domains[0] = dom0
+        back_vm.app.domains["dom0"] = dom0
         front.app = back_vm.app
         dom0.app = back_vm.app
 
@@ -1001,8 +1004,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
                 self.ext, {"1-1": {front: assmnt, back: assmnt}}
             )
 
-    @unittest.mock.patch("asyncio.create_subprocess_shell")
-    def test_014_failed_confirmation(self, shell):
+    # call_socket_service returns coroutine
+    @unittest.mock.patch(
+        'qubes.ext.utils.call_socket_service', new_callable=AsyncMock)
+    def test_014_failed_confirmation(self, socket):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
@@ -1012,10 +1017,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices["usb"]._assigned.append(assmnt)
         back.devices["usb"]._exposed.append(exp_dev)
 
-        proc = AsyncMock()
-        shell.return_value = proc
-        proc.communicate = AsyncMock()
-        proc.communicate.return_value = (b"nonsense", b"")
+        socket.return_value = "allow:nonsense"
 
         loop = asyncio.get_event_loop()
         self.ext.attach_and_notify = AsyncMock()
@@ -1026,8 +1028,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
         self.ext.attach_and_notify.assert_not_called()
 
-    @unittest.mock.patch("asyncio.create_subprocess_shell")
-    def test_015_successful_confirmation(self, shell):
+    # call_socket_service returns coroutine
+    @unittest.mock.patch(
+        'qubes.ext.utils.call_socket_service', new_callable=AsyncMock)
+    def test_015_successful_confirmation(self, socket):
         back, front = self.added_assign_setup()
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
@@ -1037,10 +1041,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices["usb"]._assigned.append(assmnt)
         back.devices["usb"]._exposed.append(exp_dev)
 
-        proc = AsyncMock()
-        shell.return_value = proc
-        proc.communicate = AsyncMock()
-        proc.communicate.return_value = (b"front-vm", b"")
+        socket.return_value = "allow:front-vm"
 
         loop = asyncio.get_event_loop()
         self.ext.attach_and_notify = AsyncMock()
