@@ -546,6 +546,14 @@ class USBDeviceExtension(qubes.ext.Extension):
             "device-attach:usb", device=device, options=assignment.options
         )
 
+    def ensure_detach(self, vm, port):
+        """
+        Run this method if device is no longer detected.
+
+        No additional action required in case of USB devices.
+        """
+        pass
+
     @qubes.ext.handler("domain-qdb-change:/qubes-usb-devices")
     def on_qdb_change(self, vm, event, path):
         """A change in QubesDB means a change in a device list."""
