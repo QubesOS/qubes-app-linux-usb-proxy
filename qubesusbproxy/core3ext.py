@@ -645,7 +645,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                     sanitized_stderr = ''.join(
                         [chr(c) for c in sanitized_stderr if 0x20 <= c < 0x80])
                     if sanitized_stderr.endswith(", "):
-                        sanitized_stderr = santizied_stderr[:-2] + "."
+                        sanitized_stderr = sanitized_stderr[:-2] + "."
                     raise QubesUSBException(
                         'Device attach failed: {}'.format(sanitized_stderr))
         finally:
