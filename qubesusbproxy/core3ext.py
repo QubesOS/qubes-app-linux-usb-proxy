@@ -58,7 +58,7 @@ except ImportError:
         def description(self):
             return self.name
 
-    class DeviceInfo(DescriptionOverrider, LegacyDeviceInfo):
+    class DeviceInfo(DescriptionOverrider, LegacyDeviceInfo):  # type: ignore
         def __init__(self, port):
             # not supported options in legacy code
             self.safe_chars = self.safe_chars.replace(" ", "")
@@ -78,12 +78,12 @@ except ImportError:
             return self.attachment
 
     @dataclasses.dataclass
-    class Port:
+    class Port:  # type: ignore
         backend_domain: Any
         port_id: Any
         devclass: Any
 
-    class DeviceInterface:
+    class DeviceInterface:  # type: ignore
         # pylint: disable=too-few-public-methods
         pass
 
@@ -105,20 +105,24 @@ HWDATA_PATH = "/usr/share/hwdata"
 
 class USBDevice(DeviceInfo):
     # pylint: disable=too-few-public-methods
-    def __init__(self, backend_domain, port_id):
+    def __init__(self, port: qubes.device_protocol.Port):
+        if port.devclass != "usb":
+            raise qubes.exc.QubesValueError(
+                f"Incompatible device class for input port: {port.devclass}"
+            )
+
         # the superclass can restrict the allowed characters
         self.safe_chars = (
             string.ascii_letters + string.digits + string.punctuation + " "
         )
-        port = Port(
-            backend_domain=backend_domain, port_id=port_id, devclass="usb"
-        )
+
+        # init parent class
         super().__init__(port)
 
-        self._qdb_ident = port_id.replace(".", "_")
+        self._qdb_ident = port.port_id.replace(".", "_")
         self._qdb_path = "/qubes-usb-devices/" + self._qdb_ident
-        self._vendor_id = None
-        self._product_id = None
+        self._vendor_id: Optional[str] = None
+        self._product_id: Optional[str] = None
 
     @property
     def vendor(self) -> str:
@@ -410,10 +414,12 @@ class USBDevice(DeviceInfo):
         # C class  class_name
         #       subclass  subclass_name         <-- single tab
         #               prog-if  prog-if_name   <-- two tabs
-        result = {}
+        result: Dict[str, Dict] = {}
         with open(
             HWDATA_PATH + "/usb.ids", encoding="utf-8", errors="ignore"
         ) as usb_ids:
+            vendor_id: Optional[str] = None
+            vendor_name: Optional[str] = None
             for line in usb_ids.readlines():
                 line = line.rstrip()
                 if line.startswith("#"):
@@ -431,6 +437,8 @@ class USBDevice(DeviceInfo):
                 if line.startswith("\t"):
                     # save vendor, device pair
                     device_id, _, device_name = line[1:].split(" ", 2)
+                    if vendor_id is None or vendor_name is None:
+                        continue
                     result[vendor_id][device_id] = vendor_name, device_name
                 else:
                     # new vendor
@@ -589,7 +597,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 vm.log.warning("Invalid USB device name detected")
                 continue
             port_id = untrusted_qdb_ident.replace("_", ".")
-            yield USBDevice(vm, port_id)
+            yield USBDevice(Port(vm, port_id, "usb"))
 
     @qubes.ext.handler("device-get:usb")
     def on_device_get_usb(self, vm, event, port_id):
@@ -600,12 +608,12 @@ class USBDeviceExtension(qubes.ext.Extension):
         if vm.untrusted_qdb.list(
             "/qubes-usb-devices/" + port_id.replace(".", "_")
         ):
-            yield USBDevice(vm, port_id)
+            yield USBDevice(Port(vm, port_id, "usb"))
 
     @staticmethod
     def get_all_devices(app):
         for vm in app.domains:
-            if not vm.is_running():
+            if not vm.is_running() or not hasattr(vm, "devices"):
                 continue
 
             for dev in vm.devices["usb"]:

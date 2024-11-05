@@ -884,7 +884,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_010_on_qdb_change_multiple_assignments_including_full(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         full_assig = DeviceAssignment(
             VirtualDevice(exp_dev.port, exp_dev.device_id),
             mode="auto-attach",
@@ -907,7 +907,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(port_assign)
         front.devices["usb"]._assigned.append(full_assig)
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-1")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
 
         self.ext.attach_and_notify = Mock()
@@ -922,7 +922,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_011_on_qdb_change_multiple_assignments_port_vs_dev(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         port_assign = DeviceAssignment(
             VirtualDevice(exp_dev.port, "*"),
             mode="auto-attach",
@@ -939,7 +939,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(dev_assign)
         front.devices["usb"]._assigned.append(port_assign)
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-1")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
 
         self.ext.attach_and_notify = Mock()
@@ -954,7 +954,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_012_on_qdb_change_multiple_assignments_dev(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         port_assign = DeviceAssignment(
             VirtualDevice(Port(exp_dev.backend_domain, "1-2", "usb"), "*"),
             mode="auto-attach",
@@ -971,10 +971,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(dev_assign)
         front.devices["usb"]._assigned.append(port_assign)
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-1")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-2")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-2", "usb"))
         )
 
         self.ext.attach_and_notify = Mock()
@@ -989,7 +989,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_013_on_qdb_change_two_fronts(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(exp_dev, mode="auto-attach")
 
         front.devices["usb"]._assigned.append(assmnt)
@@ -1010,7 +1010,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_014_failed_confirmation(self, socket):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(exp_dev, mode="auto-attach")
 
         front.devices["usb"]._assigned.append(assmnt)
@@ -1034,7 +1034,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_015_successful_confirmation(self, socket):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(exp_dev, mode="auto-attach")
 
         front.devices["usb"]._assigned.append(assmnt)
@@ -1055,7 +1055,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_016_on_qdb_change_ask(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(exp_dev, mode="ask-to-attach")
 
         front.devices["usb"]._assigned.append(assmnt)
@@ -1070,7 +1070,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_020_on_startup_multiple_assignments_including_full(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         full_assig = DeviceAssignment(
             VirtualDevice(exp_dev.port, exp_dev.device_id),
             mode="auto-attach",
@@ -1093,7 +1093,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(port_assign)
         front.devices["usb"]._assigned.append(full_assig)
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-1")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
 
         self.ext.attach_and_notify = AsyncMock()
@@ -1106,7 +1106,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_021_on_startup_multiple_assignments_port_vs_dev(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         port_assign = DeviceAssignment(
             VirtualDevice(exp_dev.port, "*"),
             mode="auto-attach",
@@ -1123,7 +1123,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(dev_assign)
         front.devices["usb"]._assigned.append(port_assign)
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-1")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
 
         loop = asyncio.get_event_loop()
@@ -1136,7 +1136,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_022_on_startup_multiple_assignments_dev(self):
         back, front = self.added_assign_setup()
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         port_assign = DeviceAssignment(
             VirtualDevice(Port(exp_dev.backend_domain, "1-2", "usb"), "*"),
             mode="auto-attach",
@@ -1153,10 +1153,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(dev_assign)
         front.devices["usb"]._assigned.append(port_assign)
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-1")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
         back.devices["usb"]._exposed.append(
-            qubesusbproxy.core3ext.USBDevice(back, "1-2")
+            qubesusbproxy.core3ext.USBDevice(Port(back, "1-2", "usb"))
         )
 
         self.ext.attach_and_notify = AsyncMock()
@@ -1169,7 +1169,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_023_on_startup_already_attached(self):
         back, front = self.added_assign_setup(attachment="sys-usb")
 
-        exp_dev = qubesusbproxy.core3ext.USBDevice(back, "1-1")
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(
             VirtualDevice(exp_dev.port, exp_dev.device_id), mode="auto-attach"
         )
