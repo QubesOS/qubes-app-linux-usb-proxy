@@ -23,7 +23,7 @@ import sys
 
 import qubes
 
-from typing import Type
+from typing import Type, Dict, Any
 
 from qubes import device_protocol
 from qubes.device_protocol import VirtualDevice
@@ -75,7 +75,7 @@ def device_list_change(
 
     ext.devices_cache[vm.name] = current_devices
 
-    to_attach = {}
+    to_attach: Dict[str, Dict] = {}
     for front_vm in vm.app.domains:
         if not front_vm.is_running():
             continue

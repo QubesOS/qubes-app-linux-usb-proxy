@@ -11,3 +11,16 @@ include:
   project: QubesOS/qubes-continuous-integration
 - file: /r4.2/gitlab-vm.yml
   project: QubesOS/qubes-continuous-integration
+
+mypy:
+  stage: checks
+  image: fedora:40
+  tags:
+    - docker
+  before_script:
+    - sudo dnf install -y python3-mypy python3-pip
+  script:
+    - mypy --install-types --non-interactive --ignore-missing-imports --junit-xml mypy.xml qubesusbproxy
+  artifacts:
+    reports:
+      junit: mypy.xml
