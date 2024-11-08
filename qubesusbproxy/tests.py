@@ -27,7 +27,6 @@ from unittest import mock
 from unittest.mock import Mock, AsyncMock
 
 import jinja2
-
 import qubes.tests.extra
 
 core3 = False
@@ -723,11 +722,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
 
-        self.ext.attach_and_notify = Mock()
+        self.ext.attach_and_notify = AsyncMock()
         loop = asyncio.get_event_loop()
-        with mock.patch("asyncio.wait"):
-            with mock.patch("asyncio.ensure_future"):
-                loop.run_until_complete(self.ext.on_domain_start(front, None))
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(
             self.ext.attach_and_notify.call_args[0][1].options, {"pid": "did"}
         )
@@ -755,11 +752,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         )
 
-        self.ext.attach_and_notify = Mock()
+        self.ext.attach_and_notify = AsyncMock()
         loop = asyncio.get_event_loop()
-        with mock.patch("asyncio.wait"):
-            with mock.patch("asyncio.ensure_future"):
-                loop.run_until_complete(self.ext.on_domain_start(front, None))
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(
             self.ext.attach_and_notify.call_args[0][1].options, {"pid": "any"}
         )
@@ -790,11 +785,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             qubesusbproxy.core3ext.USBDevice(Port(back, "1-2", "usb"))
         )
 
-        self.ext.attach_and_notify = Mock()
+        self.ext.attach_and_notify = AsyncMock()
         loop = asyncio.get_event_loop()
-        with mock.patch("asyncio.wait"):
-            with mock.patch("asyncio.ensure_future"):
-                loop.run_until_complete(self.ext.on_domain_start(front, None))
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.assertEqual(
             self.ext.attach_and_notify.call_args[0][1].options, {"any": "did"}
         )
@@ -990,10 +983,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         front.devices["usb"]._assigned.append(assmnt)
         back.devices["usb"]._exposed.append(exp_dev)
 
-        self.ext.attach_and_notify = Mock()
+        self.ext.attach_and_notify = AsyncMock()
         loop = asyncio.get_event_loop()
-        with mock.patch("asyncio.ensure_future"):
-            loop.run_until_complete(self.ext.on_domain_start(front, None))
+        loop.run_until_complete(self.ext.on_domain_start(front, None))
         self.ext.attach_and_notify.assert_not_called()
 
 
