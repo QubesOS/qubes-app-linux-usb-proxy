@@ -30,7 +30,6 @@ import jinja2
 
 import qubes.tests.extra
 
-core2 = False
 core3 = False
 LEGACY = False
 try:
@@ -70,13 +69,6 @@ try:
         LEGACY = True
 
     core3 = True
-except ImportError:
-    pass
-
-try:
-    import qubes.qubesutils
-
-    core2 = True
 except ImportError:
     pass
 
@@ -277,185 +269,6 @@ class TC_00_USBProxy(qubes.tests.extra.ExtraTestCase):
             "Device not cleaned up",
         )
         # TODO: check for kernel errors?
-
-
-class TC_10_USBProxy_core2(qubes.tests.extra.ExtraTestCase):
-    def setUp(self):
-        super().setUp()
-        self.backend, self.frontend = self.create_vms(["backend", "frontend"])
-        self.qrexec_policy("qubes.USB", self.frontend.name, self.backend.name)
-        self.dummy_usb_dev = create_usb_gadget(self.backend)
-        self.usbdev_name = f"{self.backend.name}:{self.dummy_usb_dev}"
-
-    def test_000_list_all(self):
-        usb_list = qubes.qubesutils.usb_list(self.qc)
-        self.assertIn(self.usbdev_name, usb_list)
-
-    def test_010_list_vm(self):
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertIn(self.usbdev_name, usb_list)
-
-    def test_020_attach(self):
-        self.frontend.start()
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        try:
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-        except qubes.qubesutils.USBProxyNotInstalled as e:
-            self.skipTest(str(e))
-
-        self.assertEqual(
-            self.frontend.run("lsusb -d 1234:1234", wait=True),
-            0,
-            "Device connection failed",
-        )
-
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertEqual(
-            usb_list[self.usbdev_name]["connected-to"], self.frontend
-        )
-
-    def test_030_detach(self):
-        self.frontend.start()
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        try:
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-        except qubes.qubesutils.USBProxyNotInstalled as e:
-            self.skipTest(str(e))
-
-        qubes.qubesutils.usb_detach(
-            self.qc, self.frontend, usb_list[self.usbdev_name]
-        )
-        # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(2)
-
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertIsNone(usb_list[self.usbdev_name]["connected-to"])
-
-        self.assertNotEqual(
-            self.frontend.run("lsusb -d 1234:1234", wait=True),
-            0,
-            "Device disconnection failed",
-        )
-
-    def test_040_detach_all(self):
-        self.frontend.start()
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        try:
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-        except qubes.qubesutils.USBProxyNotInstalled as e:
-            self.skipTest(str(e))
-
-        qubes.qubesutils.usb_detach_all(self.qc, self.frontend)
-        # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(2)
-
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertIsNone(usb_list[self.usbdev_name]["connected-to"])
-
-        self.assertNotEqual(
-            self.frontend.run("lsusb -d 1234:1234", wait=True),
-            0,
-            "Device disconnection failed",
-        )
-
-    def test_050_list_attached(self):
-        """Attached device should not be listed as further attachable"""
-        self.frontend.start()
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-
-        usb_list_front_pre = qubes.qubesutils.usb_list(
-            self.qc, vm=self.frontend
-        )
-
-        try:
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-        except qubes.qubesutils.USBProxyNotInstalled as e:
-            self.skipTest(str(e))
-
-        self.assertEqual(
-            self.frontend.run("lsusb -d 1234:1234", wait=True),
-            0,
-            "Device connection failed",
-        )
-
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertEqual(
-            usb_list[self.usbdev_name]["connected-to"], self.frontend
-        )
-
-        usb_list_front_post = qubes.qubesutils.usb_list(
-            self.qc, vm=self.frontend
-        )
-
-        self.assertEqual(usb_list_front_pre, usb_list_front_post)
-
-    def test_060_auto_detach_on_remove(self):
-        self.frontend.start()
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        try:
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-        except qubes.qubesutils.USBProxyNotInstalled as e:
-            self.skipTest(str(e))
-
-        remove_usb_gadget(self.backend)
-        # FIXME: usb-export script may update qubesdb with 1sec delay
-        time.sleep(1)
-
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        self.assertNotIn(self.usbdev_name, usb_list)
-        self.assertNotEqual(
-            self.frontend.run("lsusb -d 1234:1234", wait=True),
-            0,
-            "Device disconnection failed",
-        )
-
-    def test_070_attach_not_installed_front(self):
-        self.frontend.start()
-        # simulate package not installed
-        retcode = self.frontend.run(
-            "rm -f /etc/qubes-rpc/qubes.USBAttach", user="root", wait=True
-        )
-        if retcode != 0:
-            raise RuntimeError("Failed to simulate not installed package")
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        with self.assertRaises(qubes.qubesutils.USBProxyNotInstalled):
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-
-    @unittest.expectedFailure
-    def test_075_attach_not_installed_back(self):
-        self.frontend.start()
-        # simulate package not installed
-        retcode = self.backend.run(
-            "rm -f /etc/qubes-rpc/qubes.USB", user="root", wait=True
-        )
-        if retcode != 0:
-            raise RuntimeError("Failed to simulate not installed package")
-        usb_list = qubes.qubesutils.usb_list(self.qc, vm=self.backend)
-        try:
-            qubes.qubesutils.usb_attach(
-                self.qc, self.frontend, usb_list[self.usbdev_name]
-            )
-        except qubes.qubesutils.USBProxyNotInstalled:
-            pass
-        except Exception as e:
-            self.fail(
-                "Wrong exception raised (expected USBProxyNotInstalled): "
-                + f"{e!r}"
-            )
-        else:
-            self.fail("USBProxyNotInstalled not raised")
 
 
 class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
@@ -1186,8 +999,6 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
 def list_tests():
     tests = [TC_00_USBProxy]
-    if core2:
-        tests += [TC_10_USBProxy_core2]
     if core3:
         tests += [TC_20_USBProxy_core3]
     return tests
