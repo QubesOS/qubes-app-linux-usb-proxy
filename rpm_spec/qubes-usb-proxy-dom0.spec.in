@@ -12,6 +12,8 @@ BuildRequires: make
 BuildRequires: python3-devel
 BuildRequires: python3-setuptools
 
+Requires: qubes-core-dom0 >= 4.3.12
+
 Source0: qubes-usb-proxy-%{version}.tar.gz
 
 %description
