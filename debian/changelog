@@ -1,3 +1,48 @@
+qubes-usb-proxy (4.3.0) unstable; urgency=medium
+
+  [ Marek Marczykowski-Górecki ]
+  * ci: drop R4.1, add R4.3, add openqa build
+
+  [ Piotr Bartman-Szwarc ]
+  * q-dev: port
+  * q-dev: check identity
+  * q-dev: refactor device_protocol.py
+  * q-dev: implements device_id
+  * q-dev: fix detaching
+  * q-dev: update device utils
+  * q-dev: assignment.devices
+  * q-dev: backward compatibility
+  * q-dev: fix detaching
+  * q-dev: auto-attaching order
+  * q-dev: fix auto-attach
+  * q-dev: add more tests
+  * q-dev: update utils
+  * q-dev: correct english grammar
+  * q-dev: async confirmation
+  * q-dev: update utils.py
+  * q-dev: forbid usb assignment options
+  * q-dev: updated tests and wait for attachment to be done
+  * q-dev: rename attach-confirm -> qubes-device-attach-confirm
+  * q-dev: update tests
+  * typo
+  * q-dev: cleanup
+  * q-dev: call attach-confirm socket directly
+  * q-dev: update common part with admin-core
+
+  [ Frédéric Pierret (fepitre) ]
+  * Use Port for device and make mypy happy
+  * Remove core2 tests
+  * tests: use AsyncMock
+
+  [ Piotr Bartman-Szwarc ]
+  * q-dev: replace overriding with patching
+
+  [ Marek Marczykowski-Górecki ]
+  * Require new core-admin
+  * ci: drop R4.2
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sun, 17 Nov 2024 03:48:31 +0100
+
 qubes-usb-proxy (1.3.2) unstable; urgency=medium
 
   [ Ali Mirjamali ]
