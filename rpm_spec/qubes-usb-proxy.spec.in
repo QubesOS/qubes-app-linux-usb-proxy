@@ -9,6 +9,10 @@ URL:		https://www.qubes-os.org/
 BuildArch:  noarch
 
 BuildRequires: make
+%if 0%{?is_opensuse}
+# for directory ownership
+BuildRequires: qubes-core-agent
+%endif
 Requires:   usbutils
 
 Source0: %{name}-%{version}.tar.gz
