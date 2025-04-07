@@ -1,12 +1,12 @@
 install-vm:
 	install -d $(DESTDIR)/etc/qubes-rpc
-	install qubes-rpc/qubes.USBAttach $(DESTDIR)/etc/qubes-rpc
-	install qubes-rpc/qubes.USBDetach $(DESTDIR)/etc/qubes-rpc
-	install qubes-rpc/qubes.USB $(DESTDIR)/etc/qubes-rpc
+	install -p qubes-rpc/qubes.USBAttach $(DESTDIR)/etc/qubes-rpc
+	install -p qubes-rpc/qubes.USBDetach $(DESTDIR)/etc/qubes-rpc
+	install -p qubes-rpc/qubes.USB $(DESTDIR)/etc/qubes-rpc
 	install -d $(DESTDIR)/usr/lib/qubes
-	install src/usb-* $(DESTDIR)/usr/lib/qubes
+	install -p src/usb-* $(DESTDIR)/usr/lib/qubes
 	install -d $(DESTDIR)/usr/lib/udev/rules.d
-	install src/*.rules $(DESTDIR)/usr/lib/udev/rules.d
+	install -p src/*.rules $(DESTDIR)/usr/lib/udev/rules.d
 	install -d $(DESTDIR)/etc/qubes/suspend-pre.d
 	ln -s ../../../usr/lib/qubes/usb-detach-all \
 		$(DESTDIR)/etc/qubes/suspend-pre.d/usb-detach-all.sh
