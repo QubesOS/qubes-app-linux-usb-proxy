@@ -35,6 +35,7 @@ import sys
 import tempfile
 from typing import List, Optional, Dict, Tuple, Any
 
+import qubes.exc
 from qubes.utils import sanitize_stderr_for_log
 
 try:
@@ -652,7 +653,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             return
 
         if device.attachment:
-            raise qubes.devices.DeviceAlreadyAttached(
+            raise qubes.exc.DeviceAlreadyAttached(
                 f"Device {device} already attached to {device.attachment}"
             )
 
