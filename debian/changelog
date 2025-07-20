@@ -1,3 +1,11 @@
+qubes-usb-proxy (4.3.1) unstable; urgency=medium
+
+  * rpm: add BR for directory ownership check
+  * Fix exception class
+  * Fix clearing available devices cache on domain shutdown
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Sun, 20 Jul 2025 05:31:44 +0200
+
 qubes-usb-proxy (4.3.0) unstable; urgency=medium
 
   [ Marek Marczykowski-Górecki ]
