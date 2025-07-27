@@ -31,6 +31,7 @@ make install-vm DESTDIR=${RPM_BUILD_ROOT}
 /etc/qubes-rpc/qubes.USB
 /etc/qubes-rpc/qubes.USBAttach
 /etc/qubes-rpc/qubes.USBDetach
+/etc/qubes/rpc-config/qubes.USB
 /etc/qubes/suspend-pre.d/usb-detach-all.sh
 /usr/lib/qubes/usb-import
 /usr/lib/qubes/usb-export

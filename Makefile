@@ -3,6 +3,9 @@ install-vm:
 	install qubes-rpc/qubes.USBAttach $(DESTDIR)/etc/qubes-rpc
 	install qubes-rpc/qubes.USBDetach $(DESTDIR)/etc/qubes-rpc
 	install qubes-rpc/qubes.USB $(DESTDIR)/etc/qubes-rpc
+	install -d $(DESTDIR)/etc/qubes/rpc-config
+	install -T -m 0644 qubes-rpc/qubes.USB.config \
+		$(DESTDIR)/etc/qubes/rpc-config/qubes.USB
 	install -d $(DESTDIR)/usr/lib/qubes
 	install src/usb-* $(DESTDIR)/usr/lib/qubes
 	install -d $(DESTDIR)/usr/lib/udev/rules.d
