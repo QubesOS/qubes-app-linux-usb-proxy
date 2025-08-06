@@ -1,3 +1,12 @@
+qubes-usb-proxy (4.3.2) unstable; urgency=medium
+
+  * Remove old-format policy file
+  * Use rpc config to run qubes.USB as root
+  * Properly configure USB 3.1 speed, if supported by the kernel
+  * Accept USB 3.2 Gen 2x2 (20Gbps) speed
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 06 Aug 2025 05:00:13 +0200
+
 qubes-usb-proxy (4.3.1) unstable; urgency=medium
 
   * rpm: add BR for directory ownership check
