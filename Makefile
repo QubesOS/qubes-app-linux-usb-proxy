@@ -9,7 +9,7 @@ install-vm:
 	install -d $(DESTDIR)/usr/lib/qubes
 	install src/usb-* $(DESTDIR)/usr/lib/qubes
 	install -d $(DESTDIR)/usr/lib/udev/rules.d
-	install src/*.rules $(DESTDIR)/usr/lib/udev/rules.d
+	install -m 644 src/*.rules $(DESTDIR)/usr/lib/udev/rules.d
 	install -d $(DESTDIR)/etc/qubes/suspend-pre.d
 	ln -s ../../../usr/lib/qubes/usb-detach-all \
 		$(DESTDIR)/etc/qubes/suspend-pre.d/usb-detach-all.sh
