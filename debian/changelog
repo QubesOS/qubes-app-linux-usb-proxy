@@ -1,3 +1,10 @@
+qubes-usb-proxy (4.3.3) unstable; urgency=medium
+
+  [ Ali Mirjamali ]
+  * Fix udev permissions
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Thu, 25 Dec 2025 19:21:53 +0100
+
 qubes-usb-proxy (4.3.2) unstable; urgency=medium
 
   * Remove old-format policy file
