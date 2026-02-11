@@ -1,3 +1,10 @@
+qubes-usb-proxy (4.3.4) unstable; urgency=medium
+
+  [ Vertex X7-53 ]
+  * core3ext: reattach assigned USB devices on resume from suspend
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Wed, 11 Feb 2026 20:33:21 +0100
+
 qubes-usb-proxy (4.3.3) unstable; urgency=medium
 
   [ Ali Mirjamali ]
