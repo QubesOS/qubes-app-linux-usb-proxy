@@ -22,6 +22,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 import time
+import uuid
 import unittest
 from unittest import mock
 from unittest.mock import Mock, AsyncMock
@@ -620,6 +621,7 @@ class TestVM(qubes.tests.TestEmitter):
     def __init__(self, qdb, running=True, name="test-vm", **kwargs):
         super().__init__(**kwargs)
         self.name = name
+        self.uuid = uuid.uuid4()
         self.klass = "AdminVM" if name == "dom0" else "AppVM"
         self.icon = "red"
         self.untrusted_qdb = TestQubesDB(qdb)
