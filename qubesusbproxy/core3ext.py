@@ -782,7 +782,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         # pylint: disable=unused-argument
         vm.fire_event("device-list-change:usb")
         utils.device_list_change(self, {}, vm, None, USBDevice)
-        del self.autoattach_locks[vm.uuid]
+        if vm.uuid in self.autoattach_locks:
+            del self.autoattach_locks[vm.uuid]
 
     @qubes.ext.handler("domain-resumed")
     async def on_domain_resumed(self, vm, _event, **_kwargs):
