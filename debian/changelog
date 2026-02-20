@@ -1,3 +1,11 @@
+qubes-usb-proxy (4.3.5) unstable; urgency=medium
+
+  [ Vertex X7-53 ]
+  * Ensure autoattach locks dict is checked to prevent exception on
+    delete
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Fri, 20 Feb 2026 15:06:15 +0100
+
 qubes-usb-proxy (4.3.4) unstable; urgency=medium
 
   [ Vertex X7-53 ]
