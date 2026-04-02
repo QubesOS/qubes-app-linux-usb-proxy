@@ -11,7 +11,7 @@ USBDEVFS_RESET = 0x5514
 
 def main():
     if len(sys.argv) != 2:
-        print("Usage: usb-reset sysfs-devpath", file=sys.stderr())
+        print("Usage: usb-reset sysfs-devpath", file=sys.stderr)
         exit(2)
     devpath = sys.argv[1]
     uevent = (Path(devpath) / "uevent").read_text()
