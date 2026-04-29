@@ -9,6 +9,18 @@ if [ -z "$busid" ]; then
     usbip_sockfd="/sys/bus/usb/devices/$busid/usbip_sockfd"
     if [ -w "$usbip_sockfd" ]; then
         echo -1 > "$usbip_sockfd"
+
+        # avoid zombie usb (visible from backend but held by usbip driver)
+        # disconnect usbip driver
+        if ! echo "$busid" > "/sys/bus/usb/drivers/usbip-host/unbind" 2>/dev/null; then
+            echo "Failed to unbind USB device $busid from usbip-host driver" >&2
+            exit 1
+        fi
+        # reload driver to make it available in backend again
+        if ! echo "$busid" > "/sys/bus/usb/drivers_probe"; then
+            echo "Failed to reload USB device $busid driver" >&2
+            exit 1
+        fi
     else
         echo "Device $busid not found or not attached to any VM!" >&2
         exit 1
