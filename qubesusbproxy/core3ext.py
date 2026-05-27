@@ -105,6 +105,8 @@ HWDATA_PATH = "/usr/share/hwdata"
 
 
 class USBDevice(DeviceInfo):
+    _usb_known_devices = None
+
     # pylint: disable=too-few-public-methods
     def __init__(self, port: qubes.device_protocol.Port):
         if port.devclass != "usb":
@@ -385,9 +387,8 @@ class USBDevice(DeviceInfo):
         serial = self.serial if self.serial != "unknown" else ""
         return f"{vendor_id}:{product_id}:{serial}:{interfaces}"
 
-    @staticmethod
     def _get_vendor_and_product_names(
-        vendor_id: str, product_id: str
+        self, vendor_id: str, product_id: str
     ) -> Tuple[str, str]:
         """
         Return tuple of vendor's and product's names for the ids.
@@ -395,13 +396,13 @@ class USBDevice(DeviceInfo):
         If the id is not known, return ("unknown", "unknown").
         """
         return (
-            USBDevice._load_usb_known_devices()
+            self._load_usb_known_devices()
             .get(vendor_id, {})
             .get(product_id, ("unknown", "unknown"))
         )
 
-    @staticmethod
-    def _load_usb_known_devices() -> Dict[str, Dict[str, Tuple[str, str]]]:
+    @classmethod
+    def _load_usb_known_devices(cls) -> Dict[str, Dict[str, Tuple[str, str]]]:
         """
         List of known device vendors, devices and interfaces.
 
@@ -415,6 +416,8 @@ class USBDevice(DeviceInfo):
         # C class  class_name
         #       subclass  subclass_name         <-- single tab
         #               prog-if  prog-if_name   <-- two tabs
+        if cls._usb_known_devices is not None:
+            return cls._usb_known_devices
         result: Dict[str, Dict] = {}
         with open(
             HWDATA_PATH + "/usb.ids", encoding="utf-8", errors="ignore"
@@ -446,7 +449,8 @@ class USBDevice(DeviceInfo):
                     vendor_id, _, vendor_name = line[:].split(" ", 2)
                     result[vendor_id] = {}
 
-        return result
+        cls._usb_known_devices = result
+        return cls._usb_known_devices
 
 
 class USBProxyNotInstalled(qubes.exc.QubesException):
