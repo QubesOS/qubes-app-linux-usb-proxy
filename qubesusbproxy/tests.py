@@ -725,8 +725,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             self.assertEqual(
                 attach_and_notify.call_args[0][1].options, {"pid": "did"}
@@ -756,8 +757,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             self.assertEqual(
                 attach_and_notify.call_args[0][1].options, {"pid": "any"}
@@ -790,8 +792,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             self.assertEqual(
                 attach_and_notify.call_args[0][1].options, {"any": "did"}
@@ -817,7 +820,8 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
     # call_socket_service returns coroutine
     @unittest.mock.patch(
-        'qubes.ext.utils.call_socket_service', new_callable=AsyncMock)
+        "qubes.ext.utils.call_socket_service", new_callable=AsyncMock
+    )
     def test_014_failed_confirmation(self, socket):
         back, front = self.added_assign_setup()
 
@@ -831,8 +835,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         socket.return_value = "allow:nonsense"
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(
                 qubes.ext.utils.resolve_conflicts_and_attach(
                     self.ext, {"1-1": {front: assmnt, back: assmnt}}
@@ -842,7 +847,8 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
     # call_socket_service returns coroutine
     @unittest.mock.patch(
-        'qubes.ext.utils.call_socket_service', new_callable=AsyncMock)
+        "qubes.ext.utils.call_socket_service", new_callable=AsyncMock
+    )
     def test_015_successful_confirmation(self, socket):
         back, front = self.added_assign_setup()
 
@@ -856,8 +862,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         socket.return_value = "allow:front-vm"
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(
                 qubes.ext.utils.resolve_conflicts_and_attach(
                     self.ext, {"1-1": {front: assmnt, back: assmnt}}
@@ -910,8 +917,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             self.assertEqual(
                 attach_and_notify.call_args[0][1].options, {"pid": "did"}
@@ -941,8 +949,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             self.assertEqual(
                 attach_and_notify.call_args[0][1].options, {"pid": "any"}
@@ -975,8 +984,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         )
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             self.assertEqual(
                 attach_and_notify.call_args[0][1].options, {"any": "did"}
@@ -994,8 +1004,9 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices["usb"]._exposed.append(exp_dev)
 
         loop = asyncio.get_event_loop()
-        with (mock.patch.object(self.ext, "attach_and_notify")
-              as attach_and_notify):
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             attach_and_notify.assert_not_called()
 

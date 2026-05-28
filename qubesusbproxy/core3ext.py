@@ -548,7 +548,9 @@ class USBDeviceExtension(qubes.ext.Extension):
             in_progress = set()
             for assignment in to_attach.values():
                 in_progress.add(
-                    asyncio.ensure_future(self.attach_and_notify(vm, assignment))
+                    asyncio.ensure_future(
+                        self.attach_and_notify(vm, assignment)
+                    )
                 )
             if in_progress:
                 await asyncio.wait(in_progress)
