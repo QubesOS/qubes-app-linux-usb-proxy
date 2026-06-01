@@ -654,7 +654,7 @@ class USBDeviceExtension(qubes.ext.Extension):
             if (
                 not hasattr(vm, "devices")
                 or "usb" not in vm.devices
-                or not vm.is_running()
+                or not getattr(vm, "untrusted_qdb")
             ):
                 continue
 
@@ -666,7 +666,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler("device-list-attached:usb")
     def on_device_list_attached(self, vm, event, **kwargs):
         # pylint: disable=unused-argument
-        if not vm.is_running():
+        if not getattr(vm, "untrusted_qdb"):
             return
 
         for dev in self.get_all_devices(vm.app):
@@ -682,7 +682,7 @@ class USBDeviceExtension(qubes.ext.Extension):
                 "USB device attach does not support user options"
             )
 
-        if vm.qid == 0 or not vm.is_running():
+        if vm.qid == 0 or not getattr(vm, "untrusted_qdb"):
             # print(f"Qube is not running, skipping attachment of {device}",
             #       file=sys.stderr)
             return
@@ -744,7 +744,7 @@ class USBDeviceExtension(qubes.ext.Extension):
     @qubes.ext.handler("device-pre-detach:usb")
     async def on_device_detach_usb(self, vm, event, port):
         # pylint: disable=unused-argument
-        if vm.qid == 0 or not vm.is_running():
+        if vm.qid == 0 or not getattr(vm, "untrusted_qdb"):
             return
 
         for attached, _options in self.on_device_list_attached(vm, event):
