@@ -426,27 +426,32 @@ class USBDevice(DeviceInfo):
             vendor_name: Optional[str] = None
             for line in usb_ids.readlines():
                 line = line.rstrip()
-                if line.startswith("#"):
-                    # skip comments
-                    continue
                 if not line:
                     # skip empty lines
                     continue
-                if line.startswith("\t\t"):
-                    # skip interfaces
+                first_char = line[0]
+                if first_char == "#":
+                    # skip comments
                     continue
-                if line.startswith("C "):
+                if first_char == "C" and len(line) >= 2 and line[1] == " ":
                     # description of classes starts here, we can finish
                     break
-                if line.startswith("\t"):
+                if first_char == "\t":
+                    if len(line) >= 2 and line[1] == "\t":
+                        # skip interfaces
+                        continue
+                    # device line
+                    parts = line[1:].split(" ", 2)
+                    if len(parts) < 3:
+                        continue
                     # save vendor, device pair
-                    device_id, _, device_name = line[1:].split(" ", 2)
+                    device_id, _, device_name = parts
                     if vendor_id is None or vendor_name is None:
                         continue
-                    result[vendor_id][device_id] = vendor_name, device_name
+                    result[vendor_id][device_id] = (vendor_name, device_name)
                 else:
-                    # new vendor
-                    vendor_id, _, vendor_name = line[:].split(" ", 2)
+                    parts = line.split(" ", 2)
+                    vendor_id, _, vendor_name = parts
                     result[vendor_id] = {}
 
         cls._usb_known_devices = result
