@@ -653,26 +653,17 @@ class USBDeviceExtension(qubes.ext.Extension):
         ):
             yield USBDevice(Port(vm, port_id, "usb"))
 
-    @staticmethod
-    def get_all_devices(app):
-        for vm in app.domains:
-            if not vm.is_running() or not hasattr(vm, "devices"):
-                continue
-
-            for dev in vm.devices["usb"]:
-                # there may be more than one USB-passthrough implementation
-                if isinstance(dev, USBDevice):
-                    yield dev
-
     @qubes.ext.handler("device-list-attached:usb")
     def on_device_list_attached(self, vm, event, **kwargs):
         # pylint: disable=unused-argument
         if not vm.is_running():
             return
 
-        for dev in self.get_all_devices(vm.app):
-            if dev.attachment == vm:
-                yield (dev, {})
+        for ports in self.devices_cache.values():
+            for port_id, attachment in ports.items():
+                if attachment == vm:
+                    dev = USBDevice(Port(vm, port_id, "usb"))
+                    yield (dev, {})
 
     @qubes.ext.handler("device-pre-attach:usb")
     async def on_device_attach_usb(self, vm, event, device, options):
