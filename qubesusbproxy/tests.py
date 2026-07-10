@@ -569,6 +569,12 @@ class TestQubesDB:
     def read(self, key):
         return self._data.get(key, None)
 
+    def write(self, key, value):
+        self._data[key] = value
+
+    def rm(self, key):
+        self._data.pop(key, None)
+
     def list(self, prefix):
         return [key for key in self._data if key.startswith(prefix)]
 
@@ -994,6 +1000,86 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
     def test_023_on_startup_already_attached(self):
         back, front = self.added_assign_setup(attachment="sys-usb")
+
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        assmnt = DeviceAssignment(
+            VirtualDevice(exp_dev.port, exp_dev.device_id), mode="auto-attach"
+        )
+
+        front.devices["usb"]._assigned.append(assmnt)
+        back.devices["usb"]._exposed.append(exp_dev)
+
+        loop = asyncio.get_event_loop()
+        with mock.patch.object(
+            self.ext, "attach_and_notify"
+        ) as attach_and_notify:
+            loop.run_until_complete(self.ext.on_domain_start(front, None))
+            attach_and_notify.assert_not_called()
+
+    def test_030_list_busy_devices(self):
+        qdb = get_qdb()
+        qdb["/qubes-usb-devices/1-1/busy"] = b"True"
+        back_vm = TestVM(qdb=qdb, name="sys-usb")
+
+        devices = {
+            dev.port_id: dev for dev in self.ext.on_device_list_usb(back_vm, "")
+        }
+        self.assertTrue(devices["1-1"].busy)
+        self.assertFalse(devices["1-2"].busy)
+
+    def test_031_device_get_busy(self):
+        qdb = get_qdb()
+        qdb["/qubes-usb-devices/1-1/busy"] = b"True"
+        back_vm = TestVM(qdb=qdb, name="sys-usb")
+
+        devices = list(self.ext.on_device_get_usb(back_vm, "", "1-1"))
+        self.assertEqual(len(devices), 1)
+        self.assertTrue(devices[0].busy)
+
+        devices = list(self.ext.on_device_get_usb(back_vm, "", "1-2"))
+        self.assertEqual(len(devices), 1)
+        self.assertFalse(devices[0].busy)
+
+    def test_032_device_get_invalid_busy(self):
+        # an unparsable value is treated as busy
+        qdb = get_qdb()
+        qdb["/qubes-usb-devices/1-1/busy"] = b"garbage"
+        back_vm = TestVM(qdb=qdb, name="sys-usb")
+
+        devices = list(self.ext.on_device_get_usb(back_vm, "", "1-1"))
+        self.assertEqual(len(devices), 1)
+        self.assertTrue(devices[0].busy)
+
+    def test_033_attach_busy_device_refused(self):
+        back, front = self.added_assign_setup()
+        back.untrusted_qdb.write("/qubes-usb-devices/1-1/busy", b"True")
+        front.qid = 1
+
+        device = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        back.devices["usb"]._exposed.append(device)
+
+        loop = asyncio.get_event_loop()
+        with self.assertRaises(qubes.exc.QubesValueError):
+            loop.run_until_complete(
+                self.ext.on_device_attach_usb(front, "", device, options={})
+            )
+
+    def test_034_mark_busy(self):
+        back_vm = TestVM(qdb=get_qdb(), name="sys-usb")
+        device = qubesusbproxy.core3ext.USBDevice(Port(back_vm, "1-1", "usb"))
+
+        device.mark_busy(True)
+        self.assertEqual(
+            back_vm.untrusted_qdb.read("/qubes-usb-devices/1-1/busy"), b"True"
+        )
+        device.mark_busy(False)
+        self.assertIsNone(
+            back_vm.untrusted_qdb.read("/qubes-usb-devices/1-1/busy")
+        )
+
+    def test_035_on_startup_busy_not_auto_attached(self):
+        back, front = self.added_assign_setup()
+        back.untrusted_qdb.write("/qubes-usb-devices/1-1/busy", b"True")
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(
