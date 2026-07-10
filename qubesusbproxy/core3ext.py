@@ -393,7 +393,8 @@ class USBDevice(DeviceInfo):
     def busy(self) -> bool:
         """
         Is this device busy?  A device is considered busy if any of its children
-        are in use (e.g., a child device is currently attached).
+        are in use: attached to a VM or used locally in the backend VM
+        (mounted, part of a device-mapper, enabled swap).
         """
         if self._busy is None:
             if not self.backend_domain.is_running():
@@ -734,8 +735,7 @@ class USBDeviceExtension(qubes.ext.Extension):
 
         if device.busy:
             raise qubes.exc.QubesValueError(
-                f"Device {device} is busy: "
-                "check if a child device is currently attached to other VM"
+                f"Device {device} is busy: it or one of its children is in use."
             )
 
         stubdom_qrexec = (
