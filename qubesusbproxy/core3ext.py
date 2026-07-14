@@ -787,7 +787,11 @@ class USBDeviceExtension(qubes.ext.Extension):
     async def on_domain_shutdown(self, vm, _event, **_kwargs):
         # pylint: disable=unused-argument
         vm.fire_event("device-list-change:usb")
+        # devices exposed by the shutting-down backend vm:
+        # notify that they are gone and detach them from frontend vms
         utils.device_list_change(self, {}, vm, None, USBDevice)
+        # devices attached to shutting-down frontend vm: notify detach
+        utils.detach_attached_devices_on_shutdown(self, vm, USBDevice)
         if vm.uuid in self.autoattach_locks:
             del self.autoattach_locks[vm.uuid]
 

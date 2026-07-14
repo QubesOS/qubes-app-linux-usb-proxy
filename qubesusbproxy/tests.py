@@ -1010,6 +1010,27 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             attach_and_notify.assert_not_called()
 
+    def test_030_on_domain_shutdown_frontend(self):
+        # a frontend that has a usb device attached is shutting down;
+        # the detach event is expected
+        back, front = self.added_assign_setup()
+
+        exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        self.ext.devices_cache = {"sys-usb": {"1-1": front}, "front-vm": {}}
+
+        loop = asyncio.get_event_loop()
+        with mock.patch("asyncio.ensure_future"):
+            loop.run_until_complete(self.ext.on_domain_shutdown(front, None))
+
+        front.fire_event_async.assert_called_with(
+            "device-detach:usb", port=exp_dev.port
+        )
+        self.assertEqual(
+            front.fire_event_async.call_args.kwargs["port"].backend_domain,
+            back,
+        )
+        self.assertIsNone(self.ext.devices_cache["sys-usb"]["1-1"])
+
 
 def list_tests():
     tests = [TC_00_USBProxy]
