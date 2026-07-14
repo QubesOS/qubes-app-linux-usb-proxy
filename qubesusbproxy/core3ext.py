@@ -42,6 +42,7 @@ try:
     from qubes.device_protocol import DeviceInfo
     from qubes.device_protocol import DeviceInterface
     from qubes.device_protocol import Port
+    from qubes.device_protocol import qbool_untrusted_busy
     from qubes.ext import utils
 
     def get_assigned_devices(devices):
@@ -73,6 +74,7 @@ except ImportError:
             self._serial = None
             # `_load_interfaces_from_qubesdb` will never be called
             self._interfaces = "?******"
+            self._busy = None
 
         @property
         def frontend_domain(self):
@@ -90,6 +92,11 @@ except ImportError:
 
     def get_assigned_devices(devices):
         yield from devices.assignments(persistent=True)
+
+    def qbool_untrusted_busy(untrusted_busy, log=None) -> bool:
+        # legacy fallback: absent means free, any value means busy
+        # pylint: disable=unused-argument
+        return untrusted_busy is not None
 
 
 import qubes.devices
@@ -126,6 +133,18 @@ class USBDevice(DeviceInfo):
         self._qdb_path = "/qubes-usb-devices/" + self._qdb_ident
         self._vendor_id: Optional[str] = None
         self._product_id: Optional[str] = None
+
+    def mark_busy(self, busy: bool) -> None:
+        """Write or clear the busy marker in the backend VM's QDB."""
+        key = f"{self._qdb_path}/busy"
+        if not busy:
+            try:
+                self.backend_domain.untrusted_qdb.rm(key)
+            except Exception:  # pylint: disable=broad-except
+                pass
+        else:
+            self.backend_domain.untrusted_qdb.write(key, b"True")
+        self._busy = busy
 
     @property
     def vendor(self) -> str:
@@ -371,6 +390,25 @@ class USBDevice(DeviceInfo):
         return connected_to
 
     @property
+    def busy(self) -> bool:
+        """
+        Is this device busy?  A device is considered busy if any of its children
+        are in use: attached to a VM or used locally in the backend VM
+        (mounted, part of a device-mapper, enabled swap).
+        """
+        if self._busy is None:
+            if not self.backend_domain.is_running():
+                # don't cache this value
+                return False
+            untrusted_busy = self.backend_domain.untrusted_qdb.read(
+                self._qdb_path + "/busy"
+            )
+            self._busy = qbool_untrusted_busy(
+                untrusted_busy, self.backend_domain.log
+            )
+        return self._busy
+
+    @property
     def device_id(self) -> str:
         """
         Get identification of a device not related to port.
@@ -538,6 +576,8 @@ class USBDeviceExtension(qubes.ext.Extension):
                         continue
                     if device.attachment:
                         continue
+                    if device.busy:
+                        continue
                     if not assignment.matches(device):
                         print(
                             "Unrecognized identity, skipping attachment of device "
@@ -643,9 +683,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         if not vm.is_running():
             return
 
-        if vm.untrusted_qdb.list(
-            "/qubes-usb-devices/" + port_id.replace(".", "_")
-        ):
+        qdb_ident = port_id.replace(".", "_")
+        if vm.untrusted_qdb.list(f"/qubes-usb-devices/{qdb_ident}"):
             yield USBDevice(Port(vm, port_id, "usb"))
 
     @staticmethod
@@ -692,6 +731,11 @@ class USBDeviceExtension(qubes.ext.Extension):
         if device.attachment:
             raise qubes.exc.DeviceAlreadyAttached(
                 f"Device {device} already attached to {device.attachment}"
+            )
+
+        if device.busy:
+            raise qubes.exc.QubesValueError(
+                f"Device {device} is busy: it or one of its children is in use."
             )
 
         stubdom_qrexec = (
