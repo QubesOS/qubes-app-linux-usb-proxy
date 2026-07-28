@@ -1010,7 +1010,10 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             loop.run_until_complete(self.ext.on_domain_start(front, None))
             attach_and_notify.assert_not_called()
 
-    def test_030_on_domain_shutdown_frontend(self):
+    @unittest.mock.patch(
+        "qubes.ext.utils.resolve_conflicts_and_attach", new_callable=Mock
+    )
+    def test_030_on_domain_shutdown_frontend(self, _resolver):
         # a frontend that has a usb device attached is shutting down;
         # the detach event is expected
         back, front = self.added_assign_setup()
