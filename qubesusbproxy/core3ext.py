@@ -39,6 +39,7 @@ import qubes.exc
 from qubes.utils import sanitize_stderr_for_log
 
 try:
+    from qubes.device_protocol import AssignmentMode
     from qubes.device_protocol import DeviceInfo
     from qubes.device_protocol import DeviceInterface
     from qubes.device_protocol import Port
@@ -52,6 +53,9 @@ except ImportError:
     # In the case of the legacy backend, functionality is limited.
     from qubes.devices import DeviceInfo as LegacyDeviceInfo
     from qubesusbproxy import utils
+
+    # not available in the legacy API
+    AssignmentMode = None
 
     class DescriptionOverrider:
         # pylint: disable=too-few-public-methods
@@ -451,6 +455,13 @@ class USBDevice(DeviceInfo):
 
         cls._usb_known_devices = result
         return cls._usb_known_devices
+
+
+if AssignmentMode is not None:
+    # set the value for non-legacy USBDevice
+    USBDevice.SUPPORTED_ASSIGNMENT_MODES = frozenset(
+        {AssignmentMode.ASK, AssignmentMode.AUTO}
+    )
 
 
 class USBProxyNotInstalled(qubes.exc.QubesException):
