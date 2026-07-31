@@ -460,7 +460,7 @@ class USBDevice(DeviceInfo):
 if AssignmentMode is not None:
     # set the value for non-legacy USBDevice
     USBDevice.SUPPORTED_ASSIGNMENT_MODES = frozenset(
-        {AssignmentMode.ASK, AssignmentMode.AUTO}
+        {AssignmentMode.MANUAL, AssignmentMode.ASK, AssignmentMode.AUTO}
     )
 
 
