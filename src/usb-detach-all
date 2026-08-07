@@ -1,7 +1,11 @@
 #!/bin/sh
 
-# Detach all devices before suspend
+# Skip when S0ix is enabled, since we don't detach the host controller drivers
+if grep -q qubes_exp_pm_use_suspend=1 /proc/cmdline; then
+    exit 0
+fi
 
+# Detach all devices before suspend
 for dev in /sys/bus/usb/devices/*/usbip_sockfd; do
     if [ -w "$dev" ]; then
         echo -1 > "$dev"
