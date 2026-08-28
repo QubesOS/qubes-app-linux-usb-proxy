@@ -28,6 +28,7 @@ from unittest import mock
 from unittest.mock import Mock, AsyncMock
 
 import jinja2
+import qubes.devices
 import qubes.tests.extra
 
 core3 = False
@@ -38,6 +39,7 @@ try:
 
     try:
         from qubes.device_protocol import DeviceAssignment, VirtualDevice, Port
+        from qubes.device_protocol import DeviceInfo
 
         def make_assignment(backend, ident, auto_attach=False):
             return DeviceAssignment(
@@ -601,15 +603,23 @@ class TestApp:
         self.vmm = mock.Mock()
 
 
-class TestDeviceCollection:
+class TestDeviceCollection(qubes.devices.DeviceCollection):
     def __init__(self, backend_vm, devclass):
+        # pylint: disable=super-init-not-called
+        self._vm = backend_vm
+        self._bus = devclass
+        self._set = qubes.devices.AssignedCollection()
         self._exposed = []
         self._assigned = []
+        self._attached = []
         self.backend_vm = backend_vm
         self.devclass = devclass
 
     def get_assigned_devices(self):
         return self._assigned
+
+    def get_attached_devices(self):
+        return self._attached
 
     def get_exposed_devices(self):
         yield from self._exposed
@@ -621,6 +631,12 @@ class TestDeviceCollection:
             if dev.port_id == port_id:
                 return dev
         raise KeyError()
+
+
+class TestDeviceManager(qubes.devices.DeviceManager):
+    def __missing__(self, key):
+        self[key] = TestDeviceCollection(self._vm, key)
+        return self[key]
 
 
 class TestVM(qubes.tests.TestEmitter):
@@ -639,7 +655,7 @@ class TestVM(qubes.tests.TestEmitter):
         self.is_running = lambda: running
         self.log = mock.Mock()
         self.app = TestApp()
-        self.devices = {"testclass": TestDeviceCollection(self, "testclass")}
+        self.devices = TestDeviceManager(self)
 
     def __hash__(self):
         return hash(self.name)
@@ -1018,7 +1034,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
     def test_030_list_busy_devices(self):
         qdb = get_qdb()
-        qdb["/qubes-usb-devices/1-1/busy"] = b"True"
+        qdb["/qubes-usb-devices/1-1/used"] = b"True"
         back_vm = TestVM(qdb=qdb, name="sys-usb")
 
         devices = {
@@ -1029,7 +1045,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
     def test_031_device_get_busy(self):
         qdb = get_qdb()
-        qdb["/qubes-usb-devices/1-1/busy"] = b"True"
+        qdb["/qubes-usb-devices/1-1/used"] = b"True"
         back_vm = TestVM(qdb=qdb, name="sys-usb")
 
         devices = list(self.ext.on_device_get_usb(back_vm, "", "1-1"))
@@ -1043,7 +1059,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     def test_032_device_get_invalid_busy(self):
         # an unparsable value is treated as busy
         qdb = get_qdb()
-        qdb["/qubes-usb-devices/1-1/busy"] = b"garbage"
+        qdb["/qubes-usb-devices/1-1/used"] = b"garbage"
         back_vm = TestVM(qdb=qdb, name="sys-usb")
 
         devices = list(self.ext.on_device_get_usb(back_vm, "", "1-1"))
@@ -1052,7 +1068,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
 
     def test_033_attach_busy_device_refused(self):
         back, front = self.added_assign_setup()
-        back.untrusted_qdb.write("/qubes-usb-devices/1-1/busy", b"True")
+        back.untrusted_qdb.write("/qubes-usb-devices/1-1/used", b"True")
         front.qid = 1
 
         device = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
@@ -1064,22 +1080,67 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
                 self.ext.on_device_attach_usb(front, "", device, options={})
             )
 
-    def test_034_mark_busy(self):
-        back_vm = TestVM(qdb=get_qdb(), name="sys-usb")
-        device = qubesusbproxy.core3ext.USBDevice(Port(back_vm, "1-1", "usb"))
-
-        device.mark_busy(True)
-        self.assertEqual(
-            back_vm.untrusted_qdb.read("/qubes-usb-devices/1-1/busy"), b"True"
-        )
-        device.mark_busy(False)
-        self.assertIsNone(
-            back_vm.untrusted_qdb.read("/qubes-usb-devices/1-1/busy")
-        )
-
-    def test_035_on_startup_busy_not_auto_attached(self):
+    def test_034_usb_busy_when_child_attached(self):
         back, front = self.added_assign_setup()
-        back.untrusted_qdb.write("/qubes-usb-devices/1-1/busy", b"True")
+        usb_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        back.devices["usb"]._exposed.append(usb_dev)
+
+        back.devices["block"] = TestDeviceCollection(back, "block")
+        front.devices["block"] = TestDeviceCollection(front, "block")
+        disk = DeviceInfo(Port(back, "sda", "block"))
+        disk._parent = usb_dev
+        back.devices["block"]._exposed.append(disk)
+        front.devices["block"]._attached.append(
+            DeviceAssignment(disk, mode="manual")
+        )
+
+        fresh = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        self.assertTrue(fresh.busy)
+
+    def test_035_usb_free_when_nothing_attached(self):
+        back, front = self.added_assign_setup()
+        usb_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        back.devices["usb"]._exposed.append(usb_dev)
+
+        back.devices["block"] = TestDeviceCollection(back, "block")
+        front.devices["block"] = TestDeviceCollection(front, "block")
+        disk = DeviceInfo(Port(back, "sda", "block"))
+        disk._parent = usb_dev
+        back.devices["block"]._exposed.append(disk)
+
+        fresh = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        self.assertFalse(fresh.busy)
+
+    def test_036_listing_ends(self):
+        # get_all_devices() lists the USB devices of every domain, and
+        # listing them asks which ones are attached which lists them again.
+        back, front = self.added_assign_setup()
+        ext = self.ext
+
+        class EventCollection(TestDeviceCollection):
+            def get_exposed_devices(self):
+                yield from ext.on_device_list_usb(self.backend_vm, "")
+
+            __iter__ = get_exposed_devices
+
+            def get_attached_devices(self):
+                for dev, _opts in ext.on_device_list_attached(
+                    self.backend_vm, ""
+                ):
+                    yield DeviceAssignment(dev, mode="manual")
+
+        for vm in back.app.domains.values():
+            vm.devices["usb"] = EventCollection(vm, "usb")
+
+        devices = list(back.devices["usb"])
+
+        self.assertIn("1-1", [dev.port_id for dev in devices])
+        for dev in devices:
+            self.assertFalse(dev.busy)
+
+    def test_037_on_startup_busy_not_auto_attached(self):
+        back, front = self.added_assign_setup()
+        back.untrusted_qdb.write("/qubes-usb-devices/1-1/used", b"True")
 
         exp_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         assmnt = DeviceAssignment(
@@ -1119,6 +1180,21 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
             back,
         )
         self.assertIsNone(self.ext.devices_cache["sys-usb"]["1-1"])
+
+
+    def test_038_listing_answers_export_once(self):
+        # a listed device is told whether its port is exported, so reading
+        # `busy` must not send it back for another search
+        back, front = self.added_assign_setup()
+        real = back.devices.busy_ports
+
+        with mock.patch.object(
+            type(back.devices), "busy_ports", side_effect=real
+        ) as busy_ports:
+            for dev in self.ext.on_device_list_usb(back, ""):
+                self.assertFalse(dev.busy)
+
+        busy_ports.assert_called_once()
 
 
 def list_tests():
