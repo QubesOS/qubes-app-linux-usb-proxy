@@ -1,3 +1,16 @@
+qubes-usb-proxy (4.3.7) unstable; urgency=medium
+
+  [ Piotr Bartman-Szwarc ]
+  * q-dev: avoid zombie device
+  * q-dev: add usb-reset
+  * q-dev: fix and unify device detach on frontend shutdown
+  * q-dev: fix unwaited coro in tests
+
+  [ Marek Marczykowski-Górecki ]
+  * rpm: update required qubes-core-dom0 version
+
+ -- Marek Marczykowski-Górecki <marmarek@invisiblethingslab.com>  Mon, 31 Aug 2026 04:01:29 +0200
+
 qubes-usb-proxy (4.3.6) unstable; urgency=medium
 
   [ Piotr Bartman-Szwarc ]
