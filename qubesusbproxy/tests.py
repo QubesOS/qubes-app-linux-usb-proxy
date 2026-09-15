@@ -653,6 +653,7 @@ class TestVM(qubes.tests.TestEmitter):
             "4.2" if name == "qubes-agent-version" else None
         )
         self.is_running = lambda: running
+        self.is_halted = lambda: not running
         self.log = mock.Mock()
         self.app = TestApp()
         self.devices = TestDeviceManager(self)
@@ -1075,12 +1076,28 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         back.devices["usb"]._exposed.append(device)
 
         loop = asyncio.get_event_loop()
-        with self.assertRaises(qubes.exc.QubesValueError):
+        with self.assertRaises(qubes.exc.DeviceUsed):
             loop.run_until_complete(
                 self.ext.on_device_attach_usb(front, "", device, options={})
             )
 
-    def test_034_usb_busy_when_child_attached(self):
+    def test_034_refused_auto_attach_does_not_stop_whole_batch(self):
+        back, front = self.added_assign_setup()
+        back.untrusted_qdb.write("/qubes-usb-devices/1-1/used", b"True")
+        front.qid = 1
+
+        device = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
+        back.devices["usb"]._exposed.append(device)
+        assignment = DeviceAssignment(device, mode="auto-attach")
+        front.fire_event_async = AsyncMock()
+
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.ext.attach_and_notify(front, assignment))
+
+        front.fire_event_async.assert_not_called()
+        self.assertTrue(front.log.warning.called)
+
+    def test_035_usb_busy_when_child_attached(self):
         back, front = self.added_assign_setup()
         usb_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         back.devices["usb"]._exposed.append(usb_dev)
@@ -1097,7 +1114,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         fresh = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         self.assertTrue(fresh.busy)
 
-    def test_035_usb_free_when_nothing_attached(self):
+    def test_036_usb_free_when_nothing_attached(self):
         back, front = self.added_assign_setup()
         usb_dev = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         back.devices["usb"]._exposed.append(usb_dev)
@@ -1111,7 +1128,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         fresh = qubesusbproxy.core3ext.USBDevice(Port(back, "1-1", "usb"))
         self.assertFalse(fresh.busy)
 
-    def test_036_listing_ends(self):
+    def test_037_listing_ends(self):
         # get_all_devices() lists the USB devices of every domain, and
         # listing them asks which ones are attached which lists them again.
         back, front = self.added_assign_setup()
@@ -1138,7 +1155,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         for dev in devices:
             self.assertFalse(dev.busy)
 
-    def test_037_on_startup_busy_not_auto_attached(self):
+    def test_040_on_startup_busy_not_auto_attached(self):
         back, front = self.added_assign_setup()
         back.untrusted_qdb.write("/qubes-usb-devices/1-1/used", b"True")
 
@@ -1160,7 +1177,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
     @unittest.mock.patch(
         "qubes.ext.utils.resolve_conflicts_and_attach", new_callable=Mock
     )
-    def test_030_on_domain_shutdown_frontend(self, _resolver):
+    def test_041_on_domain_shutdown_frontend(self, _resolver):
         # a frontend that has a usb device attached is shutting down;
         # the detach event is expected
         back, front = self.added_assign_setup()
@@ -1182,7 +1199,7 @@ class TC_30_USBProxy_core3(qubes.tests.QubesTestCase):
         self.assertIsNone(self.ext.devices_cache["sys-usb"]["1-1"])
 
 
-    def test_038_listing_answers_export_once(self):
+    def test_042_listing_answers_export_once(self):
         # a listed device is told whether its port is exported, so reading
         # `busy` must not send it back for another search
         back, front = self.added_assign_setup()
