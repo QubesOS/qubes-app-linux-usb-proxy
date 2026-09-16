@@ -142,6 +142,7 @@ HWDATA_PATH = "/usr/share/hwdata"
 
 class USBDevice(DeviceInfo):
     _usb_known_devices = None
+    _busy: Optional[bool]
 
     # pylint: disable=too-few-public-methods
     def __init__(
