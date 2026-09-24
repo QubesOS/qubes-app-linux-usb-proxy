@@ -39,7 +39,6 @@ import qubes.exc
 from qubes.utils import sanitize_stderr_for_log
 
 try:
-    from qubes.device_protocol import AssignmentMode
     from qubes.device_protocol import DeviceInfo
     from qubes.device_protocol import DeviceInterface
     from qubes.device_protocol import Port
@@ -53,9 +52,6 @@ except ImportError:
     # In the case of the legacy backend, functionality is limited.
     from qubes.devices import DeviceInfo as LegacyDeviceInfo
     from qubesusbproxy import utils
-
-    # not available in the legacy API
-    AssignmentMode = None
 
     class DescriptionOverrider:
         # pylint: disable=too-few-public-methods
@@ -94,6 +90,16 @@ except ImportError:
 
     def get_assigned_devices(devices):
         yield from devices.assignments(persistent=True)
+
+
+try:
+    from qubes.device_protocol import AssignmentMode
+
+except ImportError:
+    # Kept separate from the block above on purpose: a core-admin that knows
+    # about the new device API but not about assignment modes should not
+    # be downgraded to the legacy API.
+    AssignmentMode = None
 
 
 import qubes.devices
