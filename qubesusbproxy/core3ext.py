@@ -92,6 +92,16 @@ except ImportError:
         yield from devices.assignments(persistent=True)
 
 
+try:
+    from qubes.device_protocol import AssignmentMode
+
+except ImportError:
+    # Kept separate from the block above on purpose: a core-admin that knows
+    # about the new device API but not about assignment modes should not
+    # be downgraded to the legacy API.
+    AssignmentMode = None
+
+
 import qubes.devices
 import qubes.ext
 import qubes.vm.adminvm
@@ -451,6 +461,13 @@ class USBDevice(DeviceInfo):
 
         cls._usb_known_devices = result
         return cls._usb_known_devices
+
+
+if AssignmentMode is not None:
+    # set the value for non-legacy USBDevice
+    USBDevice.SUPPORTED_ASSIGNMENT_MODES = frozenset(
+        {AssignmentMode.MANUAL, AssignmentMode.ASK, AssignmentMode.AUTO}
+    )
 
 
 class USBProxyNotInstalled(qubes.exc.QubesException):
