@@ -28,6 +28,12 @@ if [ -z "$busid" ]; then
             echo "Failed to reload USB device $busid driver" >&2
             exit 1
         fi
+
+        # free it for dom0 now; usb-export would clear it only up to 1 s later
+        safe_busid=$(printf '%s' "$busid" | tr ':.' '__')
+        qubesdb-rm "/qubes-usb-devices/${safe_busid}/connected-to" \
+                   "/qubes-usb-devices/${safe_busid}/x-pid" 2>/dev/null || :
+        qubesdb-write /qubes-usb-devices '' || :
     else
         echo "Device $busid not found or not attached to any VM!" >&2
         exit 1

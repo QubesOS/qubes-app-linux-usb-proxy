@@ -87,6 +87,10 @@ def device_list_change(
                     assignment.matches(device)
                     and device.port_id in added
                     and device.port_id not in attached
+                    # Do not auto-attach busy devices: attach would be
+                    # refused anyway, leaving an unhandled exception.
+                    # For backward compatibility we use `getattr`.
+                    and not getattr(device, "busy", False)
                 ):
                     frontends = to_attach.get(device.port_id, {})
                     # make it unique
