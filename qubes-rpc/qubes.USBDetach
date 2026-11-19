@@ -8,7 +8,21 @@ if [ -z "$busid" ]; then
     busid="$domain"
     usbip_sockfd="/sys/bus/usb/devices/$busid/usbip_sockfd"
     if [ -w "$usbip_sockfd" ]; then
-        echo -1 > "$usbip_sockfd"
+        # may fail if the kernel already closed the connection, that's fine
+        echo -1 2>/dev/null > "$usbip_sockfd" || :
+
+        # The kernel shuts the connection down and resets the device later, in
+        # its event handler; unbinding before it is done may crash the kernel.
+        # TIMEOUT: 5s
+        i=0
+        while [ "$(cat "/sys/bus/usb/devices/$busid/usbip_status" 2>/dev/null)" = 2 ]; do
+            if [ "$i" -ge 50 ]; then
+                echo "Timeout waiting for usbip to release USB device $busid" >&2
+                exit 1
+            fi
+            sleep 0.1
+            i=$((i + 1))
+        done
 
         # avoid zombie usb (visible from backend but held by usbip driver)
         # disconnect usbip driver
