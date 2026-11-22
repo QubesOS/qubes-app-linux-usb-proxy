@@ -73,6 +73,7 @@ except ImportError:
             self._serial = None
             # `_load_interfaces_from_qubesdb` will never be called
             self._interfaces = "?******"
+            self._busy = None
 
         @property
         def frontend_domain(self):
@@ -102,6 +103,50 @@ except ImportError:
     AssignmentMode = None
 
 
+try:
+    from qubes.devices import qbool_untrusted_used
+
+except ImportError:
+    # Kept separate from the block above on purpose: a core-admin that knows
+    # about the new device API but not yet about usage tracking shouldn't
+    # fall back to the legacy API.
+
+    def qbool_untrusted_used(untrusted_used, log=None) -> bool:
+        # pylint: disable=unused-argument
+        # legacy fallback: absent or a false literal means free, anything
+        # else busy (the backend writes "False" once a device is released)
+        if untrusted_used is None:
+            return False
+        if isinstance(untrusted_used, bytes):
+            untrusted_used = untrusted_used.decode("ascii", errors="replace")
+        return untrusted_used.strip().lower() not in ("0", "no", "false", "off")
+
+
+def backend_busy_ports(backend_domain, *args, **kwargs):
+    """`DeviceManager.busy_ports`, empty on a core-admin without it."""
+    method = getattr(backend_domain.devices, "busy_ports", None)
+    if method is None:
+        return {}
+    return method(*args, **kwargs)
+
+
+def backend_usage_tracking(backend_domain, devclass) -> bool:
+    """`DeviceCollection.usage_tracking`, false on a core-admin without it."""
+    try:
+        collection = backend_domain.devices[devclass]
+    except (LookupError, TypeError):
+        return False
+    return getattr(collection, "usage_tracking", False)
+
+
+def find_attached_subdevice(device):
+    """`Attachments.attached_subdevice`, `None` without it."""
+    attachments = getattr(device.backend_domain.devices, "attachments", None)
+    if attachments is None:
+        return None
+    return attachments().attached_subdevice(device)
+
+
 import qubes.devices
 import qubes.ext
 import qubes.vm.adminvm
@@ -116,9 +161,14 @@ HWDATA_PATH = "/usr/share/hwdata"
 
 class USBDevice(DeviceInfo):
     _usb_known_devices = None
+    _busy: Optional[bool]
 
     # pylint: disable=too-few-public-methods
-    def __init__(self, port: qubes.device_protocol.Port):
+    def __init__(
+        self,
+        port: qubes.device_protocol.Port,
+        exported: Optional[bool] = None,
+    ):
         if port.devclass != "usb":
             raise qubes.exc.QubesValueError(
                 f"Incompatible device class for input port: {port.devclass}"
@@ -136,6 +186,10 @@ class USBDevice(DeviceInfo):
         self._qdb_path = "/qubes-usb-devices/" + self._qdb_ident
         self._vendor_id: Optional[str] = None
         self._product_id: Optional[str] = None
+        # optimization: when listing, we calculate it once and pass it here to
+        #  avoid lazy evaluation later for each device.
+        #  bus = exported OR used
+        self._exported = exported
 
     @property
     def vendor(self) -> str:
@@ -381,6 +435,36 @@ class USBDevice(DeviceInfo):
         return connected_to
 
     @property
+    def busy(self) -> bool:
+        """
+        Is this device busy?  A device is considered busy if it or any of
+        its children is in use: attached to a VM or used locally in the
+        backend VM (mounted or part of a device-mapper).
+        """
+        if self._busy is None:
+            if not self.backend_domain.is_running():
+                # don't cache this value
+                return False
+
+            exported = self._exported
+            if exported is None:
+                # expensive
+                busy_ports = backend_busy_ports(self.backend_domain)
+                exported = self.port_id in busy_ports.get("usb", ())
+            if exported:
+                self._busy = True
+                return self._busy
+
+            untrusted_busy = self.backend_domain.untrusted_qdb.read(
+                self._qdb_path + "/used"
+            )
+            # A missing marker for USB simply means "not used".
+            self._busy = qbool_untrusted_used(
+                untrusted_busy, self.backend_domain.log
+            )
+        return self._busy
+
+    @property
     def device_id(self) -> str:
         """
         Get identification of a device not related to port.
@@ -555,6 +639,8 @@ class USBDeviceExtension(qubes.ext.Extension):
                         continue
                     if device.attachment:
                         continue
+                    if device.busy:
+                        continue
                     if not assignment.matches(device):
                         print(
                             "Unrecognized identity, skipping attachment of device "
@@ -602,9 +688,14 @@ class USBDeviceExtension(qubes.ext.Extension):
             allowed = allowed.strip()
             if vm.name != allowed:
                 return
-        await self.on_device_attach_usb(
-            vm, "device-pre-attach:usb", device, assignment.options
-        )
+        try:
+            await self.on_device_attach_usb(
+                vm, "device-pre-attach:usb", device, assignment.options
+            )
+        except qubes.exc.QubesException as e:
+            # Do not interrupt attachments of other devices if this one fails.
+            vm.log.warning("not attaching %s: %s", device, e)
+            return
         await vm.fire_event_async(
             "device-attach:usb", device=device, options=assignment.options
         )
@@ -647,12 +738,16 @@ class USBDeviceExtension(qubes.ext.Extension):
         untrusted_dev_list = set(
             path.split("/")[2] for path in untrusted_dev_list
         )
+        # optimization: one call for the whole listing
+        busy_ports = backend_busy_ports(vm).get("usb", ())
         for untrusted_qdb_ident in untrusted_dev_list:
             if not usb_device_re.match(untrusted_qdb_ident):
                 vm.log.warning("Invalid USB device name detected")
                 continue
             port_id = untrusted_qdb_ident.replace("_", ".")
-            yield USBDevice(Port(vm, port_id, "usb"))
+            yield USBDevice(
+                Port(vm, port_id, "usb"), exported=port_id in busy_ports
+            )
 
     @qubes.ext.handler("device-get:usb")
     def on_device_get_usb(self, vm, event, port_id):
@@ -660,9 +755,8 @@ class USBDeviceExtension(qubes.ext.Extension):
         if not vm.is_running():
             return
 
-        if vm.untrusted_qdb.list(
-            "/qubes-usb-devices/" + port_id.replace(".", "_")
-        ):
+        qdb_ident = port_id.replace(".", "_")
+        if vm.untrusted_qdb.list(f"/qubes-usb-devices/{qdb_ident}"):
             yield USBDevice(Port(vm, port_id, "usb"))
 
     @staticmethod
@@ -690,6 +784,9 @@ class USBDeviceExtension(qubes.ext.Extension):
     async def on_device_attach_usb(self, vm, event, device, options):
         # pylint: disable=unused-argument
 
+        # Consumed here, it is not a property of the attachment.
+        force = qubes.property.bool(None, None, options.pop("force", "no"))
+
         if options:
             raise qubes.exc.QubesException(
                 "USB device attach does not support user options"
@@ -706,10 +803,54 @@ class USBDeviceExtension(qubes.ext.Extension):
             #       file=sys.stderr)
             return
 
-        if device.attachment:
+        if device.attachment == vm:
             raise qubes.exc.DeviceAlreadyAttached(
-                f"Device {device} already attached to {device.attachment}"
+                f"Device {device} is already attached to this VM ({vm})."
             )
+
+        if device.attachment:
+            # naming the holder would tell the caller about a qube it may
+            # have no access to
+            raise qubes.exc.DeviceAlreadyAttached(
+                f"Device {device} is already attached to another VM."
+            )
+
+        # Check if any subdevice is already attached.
+        attached_sub = find_attached_subdevice(device)
+        if attached_sub is not None:
+            subdevice, _frontend = attached_sub
+            raise qubes.exc.DeviceUsed(
+                f"Device {device} cannot be attached: its subdevice "
+                f"{subdevice} is attached to another VM."
+            )
+
+        if device.busy:
+            if not force:
+                raise qubes.exc.DeviceUsed(
+                    f"Device {device} is busy: it or one of its subdevices is "
+                    "in use."
+                )
+
+        if not force:
+            # Subdevices of a USB device belong to other classes, and each
+            # class reports usage on its own.
+            subdevices = [
+                sub
+                for sub in getattr(device, "subdevices", [])
+                if not backend_usage_tracking(
+                    device.backend_domain, sub.port.devclass
+                )
+            ]
+            # Their local usage goes unreported, so the mount is torn away
+            # mid-write and whatever was not flushed can be lost.
+            if subdevices:
+                names = ", ".join(str(sub) for sub in subdevices)
+                raise qubes.exc.DeviceUsed(
+                    f"VM {device.backend_domain.name} doesn't have sufficiently"
+                    f" up-to-date version of qubes-utils. {device} contains "
+                    f"subdevices ({names}) and attaching may result in loss "
+                    "of some data. Repeat with --force to attach regardless."
+                )
 
         stubdom_qrexec = (
             vm.virt_mode == "hvm"

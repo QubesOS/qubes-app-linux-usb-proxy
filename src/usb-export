@@ -148,10 +148,15 @@ safe_busid=${busid//:/_}
 safe_busid=${safe_busid//./_}
 
 cleanup() {
+    # Two commands: the line continuation used to fold qubesdb-write into
+    # qubesdb-rm's arguments, which removed the watch trigger key instead
+    # of writing it. Tolerant of the keys being gone already -
+    # qubes.USBDetach releases them itself - since a failure here would
+    # stop the trap before the trigger write.
     qubesdb-rm \
-        /qubes-usb-devices/${safe_busid}/connected-to \
-        /qubes-usb-devices/${safe_busid}/x-pid \
-        qubesdb-write /qubes-usb-devices ''
+        "/qubes-usb-devices/${safe_busid}/connected-to" \
+        "/qubes-usb-devices/${safe_busid}/x-pid" 2>/dev/null || :
+    qubesdb-write /qubes-usb-devices '' || :
     exit
 }
 trap "cleanup" EXIT TERM
