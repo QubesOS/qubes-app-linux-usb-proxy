@@ -21,6 +21,7 @@
 # with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
+import os
 import time
 import uuid
 import unittest
@@ -530,16 +531,15 @@ class TC_20_USBProxy_core3(qubes.tests.extra.ExtraTestCase):
                 "USBProxyNotInstalled: " + str(e)
             )
 
-    def test_080_attach_existing_policy(self):
+    def test_080_attach_removes_policy(self):
+        """Attach leaves no temporary qubes.USB rule behind."""
         self.frontend.start()
-        # this override policy file, but during normal execution it shouldn't
-        # exist, so should be ok, especially on a testing system
-        with open(
-            f"/etc/qubes-rpc/policy/qubes.USB+{self.usbdev_ident}", "w+"
-        ) as policy_file:
-            policy_file.write("# empty policy\n")
+        before = set(os.listdir(qubesusbproxy.core3ext.RUNTIME_POLICY_DIR))
         ass = make_assignment(self.backend, self.usbdev_ident)
         self.loop.run_until_complete(self.frontend.devices["usb"].attach(ass))
+        self.assertEqual(
+            set(os.listdir(qubesusbproxy.core3ext.RUNTIME_POLICY_DIR)), before
+        )
 
     @unittest.skipIf(is_r40, "Not supported on R4.0")
     def test_090_attach_stubdom(self):

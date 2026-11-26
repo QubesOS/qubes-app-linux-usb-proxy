@@ -23,16 +23,15 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import asyncio
 import collections
+import contextlib
 import dataclasses
-import fcntl
-import grp
 import os
 import re
 import string
 import subprocess
 import sys
+import uuid
 
-import tempfile
 from typing import List, Optional, Dict, Tuple, Any
 
 import qubes.exc
@@ -105,6 +104,8 @@ except ImportError:
 import qubes.devices
 import qubes.ext
 import qubes.vm.adminvm
+
+RUNTIME_POLICY_DIR = "/run/qubes/policy.d"
 
 usb_device_re = re.compile(r"^[0-9]+-[0-9]+(_[0-9]+)*$")
 # should match valid VM name
@@ -478,58 +479,24 @@ class QubesUSBException(qubes.exc.QubesException):
     pass
 
 
-def modify_qrexec_policy(service, line, add):
+@contextlib.contextmanager
+def allow_usb_service(port_id, source, target):
     """
-    Add/remove *line* to qrexec policy of a *service*.
-    If policy file is missing, it is created. If resulting policy would be
-    empty, it is removed.
-
-    :param service: service name
-    :param line: line to add/remove
-    :param add: True if line should be added, otherwise False
-    :return: None
+    Allow *source* to call qubes.USB+*port_id* on *target* while the
+    context is active.
     """
-    path = f"/etc/qubes-rpc/policy/{service}"
-    while True:
-        with open(path, "a+") as policy:
-            # take the lock here, it's released by closing the file
-            fcntl.lockf(policy.fileno(), fcntl.LOCK_EX)
-            # While we were waiting for lock, someone could have unlink()ed
-            # (or rename()d) our file out of the filesystem. We have to
-            # ensure we got lock on something linked to filesystem.
-            # If not, try again.
-            if os.fstat(policy.fileno()) != os.stat(path):
-                continue
-
-            policy.seek(0)
-
-            policy_rules = policy.readlines()
-            if add:
-                policy_rules.insert(0, line)
-            else:
-                # handle also cases where previous cleanup failed or
-                # was done manually
-                while line in policy_rules:
-                    policy_rules.remove(line)
-
-            if policy_rules:
-                with tempfile.NamedTemporaryFile(
-                    prefix=path, delete=False
-                ) as policy_new:
-                    policy_new.write("".join(policy_rules).encode())
-                    policy_new.flush()
-                    try:
-                        os.chown(
-                            policy_new.name, -1, grp.getgrnam("qubes").gr_gid
-                        )
-                        os.chmod(policy_new.name, 0o660)
-                    except KeyError:  # group 'qubes' not found
-                        # don't change mode if no 'qubes' group in the system
-                        pass
-                os.rename(policy_new.name, path)
-            else:
-                os.remove(path)
-        break
+    # no VM names here: one invalid file name makes qrexec deny every call
+    path = os.path.join(
+        RUNTIME_POLICY_DIR, f"50-usb-proxy-{port_id}-{uuid.uuid4().hex}.policy"
+    )
+    with open(path, "x", encoding="ascii") as policy:
+        policy.write(
+            f"qubes.USB +{port_id} {source} {target} allow user=root\n"
+        )
+    try:
+        yield
+    finally:
+        os.unlink(path)
 
 
 class USBDeviceExtension(qubes.ext.Extension):
@@ -726,11 +693,9 @@ class USBDeviceExtension(qubes.ext.Extension):
         # (one on qubesdb watch and the other by the caller of this method)
         self.devices_cache[device.backend_domain.name][device.port_id] = vm
 
-        # set qrexec policy to allow this device
-        policy_line = f"{name} {device.backend_domain.name} allow,user=root\n"
-        modify_qrexec_policy(f"qubes.USB+{device.port_id}", policy_line, True)
-        try:
-            # and actual attach
+        with allow_usb_service(
+            device.port_id, name, device.backend_domain.name
+        ):
             try:
                 await vm.run_service_for_stdio(
                     "qubes.USBAttach",
@@ -749,10 +714,6 @@ class USBDeviceExtension(qubes.ext.Extension):
                     f"Device attach failed: {sanitize_stderr_for_log(e.output)}"
                     f" {sanitize_stderr_for_log(e.stderr)}"
                 )
-        finally:
-            modify_qrexec_policy(
-                f"qubes.USB+{device.port_id}", policy_line, False
-            )
 
     @qubes.ext.handler("device-pre-detach:usb")
     async def on_device_detach_usb(self, vm, event, port):
